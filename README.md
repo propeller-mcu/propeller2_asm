@@ -14,5 +14,5 @@ Helpful Links
 <ul>
   <li> The Parallax website <a href="https://www.parallax.com/">https://www.parallax.com/</a>
   <li> The Parallax online forums <a href="https://forums.parallax.com/">https://forums.parallax.com/</a>
-  <li> Flexprop - A simple GUI for Propeller development <a href="https://github.com/totalspectrum/flexprop">https://github.com/totalspectrum/flexprop/</a>
+  <li> Flexprop - Software used for Propeller development <a href="https://github.com/totalspectrum/flexprop">https://github.com/totalspectrum/flexprop/</a>
 </ul>
