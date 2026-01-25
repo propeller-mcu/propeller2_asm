@@ -1,19 +1,17 @@
-Propeller 2 Assembly Beginner Guide
+# Propeller 2 Assembly Beginner Guide
 
-Welcome to the Propeller 2 Assembly Guides, a complete beginner-friendly guide to programming the Propeller 2 microcontroller in assembly.
+Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly guide to programming the **Propeller 2 microcontroller** in assembly.
 
 This repository contains:
-<ul>
-  <li> a P2ASM beginner guide
-  <li> the P2ASM beginner example programs
-</ul>
 
-There are also demonstration videos to help you learn step by step.
+- **P2ASM Beginner Guide** – Step-by-step instructions for learning Propeller 2 assembly  
+- **Example Programs** – Clean P2ASM programs corresponding to each chapter  
+- **Demonstration Videos** – Videos to help you follow along and understand each example
 
+---
 
-Helpful Links
-<ul>
-  <li> The Parallax website <a href="https://www.parallax.com/">https://www.parallax.com/</a>
-  <li> The Parallax online forums <a href="https://forums.parallax.com/">https://forums.parallax.com/</a>
-  <li> Flexprop - Software used for Propeller development <a href="https://github.com/totalspectrum/flexprop">https://github.com/totalspectrum/flexprop/</a>
-</ul>
+## Helpful Resources
+
+- [Parallax Website](https://www.parallax.com/) – Official Propeller 2 info and documentation  
+- [Parallax Forums](https://forums.parallax.com/) – Community discussion and support  
+- [FlexProp](https://github.com/totalspectrum/flexprop/) – Software used for Propeller development
