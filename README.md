@@ -7,7 +7,7 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly gui
 ## Contents
 
 - **P2ASM Beginner Guide** – Step-by-step instructions for learning Propeller 2 assembly  
-- **Example Programs** – Clean P2ASM programs corresponding to each chapter  
+- **<a href="https://github.com/propeller-mcu/propeller2_asm/tree/main/examples">Example programs</a>** – Clean P2ASM programs corresponding to each chapter  
 - **Demonstration Videos** – Videos to help you follow along and understand each example
 
 ---
