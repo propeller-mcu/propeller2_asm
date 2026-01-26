@@ -2,7 +2,9 @@
 
 Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly guide to programming the **Propeller 2 microcontroller** in assembly.
 
-This repository contains:
+---
+
+## Contents
 
 - **P2ASM Beginner Guide** – Step-by-step instructions for learning Propeller 2 assembly  
 - **Example Programs** – Clean P2ASM programs corresponding to each chapter  
