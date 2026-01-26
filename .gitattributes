@@ -1,2 +1,2 @@
 # Treat Propeller 2 assembly files as Assembly for GitHub stats and highlighting
-*.p2asm linguist-language=Propeller2Assembly
+*.p2asm linguist-language=C
