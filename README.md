@@ -1,6 +1,6 @@
-# Propeller 2 Assembly Beginner Guide
+# Propeller 2 Assembly Beginner Guides
 
-Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly guide to programming the **Propeller 2 microcontroller** in assembly.
+Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly repository to programming the **Propeller 2 microcontroller** in assembly.
 
 ---
 
