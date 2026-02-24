@@ -19,9 +19,16 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 - [FlexProp](https://github.com/totalspectrum/flexprop/) – Software used for Propeller development
 
 ## Updates
-02/24/2026
-  All examples now explicitly terminate with:
-  endprog
-      jmp #$
-  This prevents the cog from executing into variable (res) memory. 
-  Ensures stable PST behavior and avoids stale RAM execution.
+
+### 2026-02-24
+
+#### Safe Program Termination Update
+
+All examples now explicitly terminate with:
+
+```asm
+endprog
+    jmp #$
+```
+
+This prevents execution into variable (`res`) memory and ensures stable PST behavior.
