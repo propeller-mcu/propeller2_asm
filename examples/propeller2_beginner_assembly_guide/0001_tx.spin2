@@ -16,3 +16,6 @@ DAT
   dirh   #TRANSMISSION_PIN
   
   wypin  #"0", #TRANSMISSION_PIN
+
+  endprog
+    jmp  #$
