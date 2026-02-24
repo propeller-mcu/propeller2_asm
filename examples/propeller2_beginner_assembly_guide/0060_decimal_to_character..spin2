@@ -1,0 +1,36 @@
+'decimal_to_character.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov number, #4
+    call #DecToStr
+
+    add asciiChar, #"0"
+    wypin asciiChar, #TRANSMISSION_PIN
+    waitx ##DELAY
+
+    jmp #endprog
+
+  DecToStr
+    mov asciiChar, number
+    ret
+      
+  endprog        
+
+  asciiChar   res 1
+  number      res 1

@@ -1,0 +1,63 @@
+'label.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000 / 6
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  call #PrintEven
+  call #PrintOdd
+  jmp #endprog
+
+  PrintEven
+    mov number1, ##0
+    .loop
+      mov ascii_out, number1
+      add ascii_out, #"0"
+      wypin ascii_out, #TRANSMISSION_PIN
+      call #flush
+      add number1, ##2
+      cmp number1, ##10 wc
+      if_ge jmp #.endLoop
+      jmp #.loop
+    .endLoop
+    ret
+
+  PrintOdd
+    mov number1, ##1
+    .loop
+      mov ascii_out, number1
+      add ascii_out, #"0"
+      wypin ascii_out, #TRANSMISSION_PIN
+      call #flush
+      add number1, ##2
+      cmp number1, ##11 wcz
+      if_nc jmp #.endLoop
+      jmp #.loop
+    .endLoop
+    ret
+
+flush
+    mov count, ##DELAY
+.delay
+    sub count, #1 wz
+    if_nz jmp #.delay
+    ret
+
+
+  endprog
+
+  number1   res 1
+  ascii_out res 1
+  count     res 1

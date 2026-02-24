@@ -1,0 +1,40 @@
+'pollct1.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  mov counter, #0
+  mov delay, ##_CLKFREQ
+  mov time_duration, #5
+
+  sleep
+    getct timeout
+   .loop
+     addct1 timeout, delay
+   .wait
+     pollct1
+     if_c jmp #.wait
+     add counter, #1
+     cmp counter, time_duration wz
+     if_nz jmp #.loop
+   .end
+        
+   wypin #"#", #TRANSMISSION_PIN
+
+
+  timeout       res 1
+  counter       res 1
+  delay         res 1
+  time_duration res 1

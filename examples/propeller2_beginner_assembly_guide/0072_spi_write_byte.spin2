@@ -1,0 +1,153 @@
+'spi_write_byte.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+  SPI_CS   = 61
+  SPI_CLK  = 60
+  SPI_MOSI = 59
+  SPI_MISO = 58
+
+  SPI_CLK_MODE   = P_TRANSITION + P_OE
+  SPI_MOSI_MODE  = P_SYNC_TX + P_OE | ((SPI_CLK - SPI_MOSI) & %111) << 24
+  SPI_MISO_MODE  = P_SYNC_RX | ((SPI_CLK - SPI_MISO) & %111) << 24
+  SPI_CLK_DIV    = (_CLKFREQ / 100_000_000) #> 4
+  SPI_8BIT_CONTROL  = $27
+
+DAT
+  org 0
+  asmclk
+  
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+  
+  wrpin   ##SPI_CLK_MODE, #SPI_CLK
+  wrpin   ##SPI_MOSI_MODE, #SPI_MOSI
+  wrpin   ##SPI_MISO_MODE, #SPI_MISO
+  wxpin   ##SPI_CLK_DIV, #SPI_CLK
+  drvl    #SPI_CLK
+  
+  wxpin   ##SPI_8BIT_CONTROL, #SPI_MOSI
+  wxpin   ##SPI_8BIT_CONTROL, #SPI_MISO
+  
+  mov flash_address, ##0
+  mov page_size, ##255
+  
+  call #spi_write_enable
+  call #spi_erase_sector
+  call #spi_write_enable
+  
+  mov flash_address, #$0
+  mov spi_reception, #"b"
+  call #spi_byte_write
+  
+  jmp  #endprog
+
+  spi_write_enable
+    drvl #SPI_CS
+    mov spi_command, #$06
+    call #spi_transmit
+    drvh #SPI_CS
+    .wait_wel
+      call #spi_read_status_register
+      testb status_register, #2 wz
+      if_z jmp #.wait_wel
+    ret
+    
+  spi_read_status_register
+    drvl #SPI_CS
+    mov spi_command, #$05
+    call #spi_transmit
+    call #spi_receive
+    mov status_register, spi_reception
+    drvh #SPI_CS
+    ret
+    
+  spi_erase_sector
+    drvl #SPI_CS
+    mov spi_command, #$20
+    call #spi_transmit
+    call #spi_send_address24
+    drvh #SPI_CS
+    .wait_busy
+      call #spi_read_status_register
+      testb status_register, #0 wz
+      if_z jmp #.wait_busy
+    ret
+
+  spi_send_address24
+    mov spi_command, flash_address
+    shr spi_command, #16
+    and spi_command, #$FF
+    call #spi_transmit
+    
+    mov spi_command, flash_address
+    shr spi_command, #8
+    and spi_command, #$FF
+    call #spi_transmit
+    
+    mov spi_command, flash_address
+    and spi_command, #$FF
+    call #spi_transmit
+    ret
+
+  spi_byte_write
+    drvl #SPI_CS
+    mov spi_command, #$02
+    call #spi_transmit
+    call #spi_send_address24
+    mov byte_count, #256
+    .page_loop
+      mov spi_command, spi_reception
+      call #spi_transmit
+      djnz byte_count, #.page_loop
+      drvh #SPI_CS
+    ret
+
+  spi_transmit
+    shl spi_command,#24
+    rev spi_command
+    wypin spi_command,#SPI_MOSI
+    drvl #SPI_MOSI
+    wypin #16,#SPI_CLK
+    waitx ##1
+    .waitRdy
+      testp   #SPI_CLK wz
+      if_nz   jmp #.waitRdy
+    ret
+
+  spi_receive
+    drvl #SPI_MISO
+    fltl #SPI_MOSI
+    wypin #16,#SPI_CLK
+    waitx ##1
+    .waitDone
+      testp #SPI_CLK wz
+      if_nz  jmp #.waitDone
+      rdpin spi_reception,#SPI_MISO
+      rev spi_reception
+      zerox spi_reception,#7
+    ret
+
+  uart_transmit_char
+    wypin uart_transmission, #TRANSMISSION_PIN
+    .txwait
+      rdpin pr2, #TRANSMISSION_PIN wc
+      if_c  jmp #.txwait
+    ret
+
+  endprog
+
+  spi_command        res 1
+  flash_address      res 1
+  byte_count         res 1
+  spi_reception      res 1
+  uart_transmission  res 1
+  page_size          res 1
+  status_register    res 1

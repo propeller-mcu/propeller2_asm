@@ -1,0 +1,86 @@
+'line_edit.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+  
+  wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+  wxpin   ##BAUD_MODE, #RECEPTION_PIN
+  dirh    #RECEPTION_PIN
+  
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+
+  main
+    mov     buffer_pointer, #input_buffer_array
+
+    .read_char
+      testp   #RECEPTION_PIN wc
+      if_nc   jmp     #.read_char
+
+      rdpin   input_character, #RECEPTION_PIN
+      akpin   #RECEPTION_PIN
+      
+      shr     input_character, #24
+      and     input_character, #$FF
+      
+      cmp     input_character, ##$0D wz
+      if_z    jmp     #.line_done
+      
+      cmp     input_character, ##$08 wz
+      if_z    jmp     #.handle_backspace
+      
+      cmp     input_character, ##$7F wz
+      if_z    jmp     #.handle_backspace
+      
+      wypin   input_character, #TRANSMISSION_PIN
+      call    #flush_tx
+      
+      wrbyte  input_character, buffer_pointer
+      add     buffer_pointer, #1
+      
+      jmp     #.read_char
+
+    .handle_backspace
+      cmp     buffer_pointer, #input_buffer_array wz
+      if_z    jmp     #.read_char
+    
+      sub     buffer_pointer, #1
+    
+      wypin   ##$08, #TRANSMISSION_PIN
+      call    #flush_tx
+      wypin   ##32, #TRANSMISSION_PIN
+      call    #flush_tx
+      wypin   ##$08, #TRANSMISSION_PIN
+      call    #flush_tx
+    
+      jmp     #.read_char
+
+    .line_done
+      wrbyte  #0, buffer_pointer
+    
+      wypin   ##$0D, #TRANSMISSION_PIN
+      call    #flush_tx
+      wypin   ##$0A, #TRANSMISSION_PIN
+      call    #flush_tx
+    
+      jmp     #main
+
+  flush_tx
+    rdpin   transmission_busy, #TRANSMISSION_PIN wc
+    if_c    jmp     #flush_tx
+    ret
+
+  input_character       res 1
+  transmission_busy     res 1
+  buffer_pointer        res 1
+  input_buffer_array    res 32

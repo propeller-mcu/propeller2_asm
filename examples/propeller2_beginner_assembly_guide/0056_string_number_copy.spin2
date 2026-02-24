@@ -1,0 +1,70 @@
+'string_number_copy.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov sourcePointer, #@mystring1
+    mov destinationPointer, #@mystring2
+    mov maxCopyBytes, #2
+    call #string_number_copy
+    
+    mov     destinationPointer, #@mystring2
+    .loop_transmit
+      rdbyte  currentChar, destinationPointer
+      cmp     currentChar, #0 wz
+      if_z    jmp #endprog
+      wypin   currentChar, #TRANSMISSION_PIN
+      waitx ##DELAY
+      add     destinationPointer, #1
+      jmp #.loop_transmit
+
+      jmp #endprog
+
+  string_number_copy
+    .loop
+      cmp     maxCopyBytes, #0 wz
+      if_z    ret
+
+      rdbyte  currentChar, sourcePointer
+      cmp     currentChar, #0 wz
+      if_z    jmp #.fill_zero
+
+      wrbyte  currentChar, destinationPointer
+      add     sourcePointer, #1
+      add     destinationPointer, #1
+      sub     maxCopyBytes, #1
+      jmp     #.loop
+
+    .fill_zero
+      mov     currentChar, #0
+    .fill_loop
+      wrbyte  currentChar, destinationPointer
+      add     destinationPointer, #1
+      sub     maxCopyBytes, #1
+      cmp     maxCopyBytes, #0 wz
+      if_z    ret
+      jmp #.fill_loop
+
+  endprog
+
+  currentChar        res 1
+  sourcePointer      res 1
+  destinationPointer res 1
+  maxCopyBytes       res 1
+
+  mystring1          byte "Hello!",0
+  mystring2          byte 0,0,0,0,0,0,0

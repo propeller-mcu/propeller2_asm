@@ -1,0 +1,40 @@
+'cog_addition.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000 / 2
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    coginit #1, ##@addition           
+
+    waitx   ##DELAY
+
+    rdword  calculation_result, ##@calculation_result_hub            
+    add     calculation_result, #"0"
+    wypin   calculation_result, #TRANSMISSION_PIN
+
+    jmp #endprog
+
+  addition
+    mov     calculation_result, #4
+    add     calculation_result, #2
+    wrword  calculation_result, ##@calculation_result_hub
+    cogstop #1
+    ret
+
+  endprog
+
+  calculation_result      res 1
+  calculation_result_hub  word 0

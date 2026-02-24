@@ -1,0 +1,52 @@
+'string_copy.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov     sourcePointer, #@mystring1
+    mov     destinationPointer, #@mystring2
+    call    #string_copy
+
+    mov     destinationPointer, #@mystring2
+      .loop_transmit
+        rdbyte  currentChar, destinationPointer
+        cmp     currentChar, #0 wz
+        if_z    jmp #endprog
+        wypin   currentChar, #TRANSMISSION_PIN
+        waitx ##DELAY
+        add     destinationPointer, #1
+      jmp #.loop_transmit
+
+      jmp #endprog
+
+  string_copy
+    .loop
+      rdbyte  currentChar, sourcePointer
+      wrbyte  currentChar, destinationPointer
+      add     sourcePointer, #1
+      add     destinationPointer, #1
+      cmp     currentChar, #0 wz
+      if_z    ret
+      jmp #.loop
+
+  endprog
+
+  currentChar         res 1
+  sourcePointer       res 1
+  destinationPointer  res 1
+
+  mystring1           byte "Hello!",0
+  mystring2           byte 0,0,0,0,0,0,0       ' enough space for copy

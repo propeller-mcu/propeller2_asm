@@ -1,0 +1,36 @@
+'cog_control.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000 / 2
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  start
+    call #print_cogid                
+    coginit #newcog, ##@print_cogid
+    waitx ##DELAY
+    cogstop #1                       
+    
+  jmp #endprog
+
+  print_cogid
+    cogid cog_number
+    add cog_number, #"0"
+    wypin cog_number, #TRANSMISSION_PIN
+    waitx ##DELAY
+    ret
+    
+  endprog
+
+  cog_number res 1

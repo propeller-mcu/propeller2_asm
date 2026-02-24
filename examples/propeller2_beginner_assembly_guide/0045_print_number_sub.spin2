@@ -1,0 +1,52 @@
+'print_number_sub.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  mov     number_store, #245
+  wrlong  number_store, ##@number1
+  rdlong  number_store, ##@number1
+  mov     value, number_store
+
+  mov     digit, #0
+  hundreds_loop
+    cmp     value, #100   wc
+    if_nc  sub     value, #100
+    if_nc  add     digit, #1
+    if_nc  jmp     #hundreds_loop
+    
+  add     digit, #"0"
+  wypin   digit, #TRANSMISSION_PIN
+  waitx   ##1000
+
+  mov     digit, #0
+  tens_loop
+    cmp     value, #10    wc
+    if_nc  sub     value, #10
+    if_nc  add     digit, #1
+    if_nc  jmp     #tens_loop
+    
+  add     digit, #"0"
+  wypin   digit, #TRANSMISSION_PIN
+  waitx   ##1000
+
+  mov     digit, value
+  add     digit, #"0"
+  wypin   digit, #TRANSMISSION_PIN
+
+  number1        long 0
+  number_store   res 1
+  value          res 1
+  digit          res 1

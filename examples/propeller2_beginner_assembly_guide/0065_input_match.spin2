@@ -1,0 +1,90 @@
+'input_match.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+dat
+  org       0
+  asmclk
+  
+  wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+  wxpin   ##BAUD_MODE, #RECEPTION_PIN
+  dirh    #RECEPTION_PIN
+
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+        
+  main
+    mov buffer_pointer, #input_buffer_array
+
+    .read_char
+      testp   #RECEPTION_PIN wc
+      if_nc  jmp #.read_char
+
+      rdpin input_character, #RECEPTION_PIN
+      shr input_character, #24
+      and input_character, #$FF
+      akpin #RECEPTION_PIN
+
+      wypin input_character, #TRANSMISSION_PIN
+      call #.flush_tx
+
+      wrbyte input_character, buffer_pointer
+      add buffer_pointer, #1
+
+      cmp input_character, ##$0D wz
+      if_nz  jmp #.read_char
+
+      wrbyte #0, buffer_pointer
+      mov command_pointer, #@cmd_hello
+      mov buffer_pointer, #input_buffer_array
+      call #.check_match
+
+      jmp #main
+
+  .check_match
+    rdbyte input_character, buffer_pointer
+    rdbyte compare_character, command_pointer
+    cmp compare_character, #0 wz
+    if_z  jmp #.print_world
+    cmp input_character, compare_character wz
+    if_nz  ret
+    add buffer_pointer, #1
+    add command_pointer, #1
+    jmp #.check_match
+
+   .print_world
+     mov message_pointer, #@msg_world
+     call #.print_string
+     ret
+
+   .print_string
+   .nextch
+     rdbyte compare_character, message_pointer
+     cmp compare_character, #0 wz
+     if_z ret
+     wypin compare_character, #TRANSMISSION_PIN
+     call #.flush_tx
+     add message_pointer, #1
+     jmp #.nextch
+
+   .flush_tx
+     rdpin compare_character, #TRANSMISSION_PIN wc
+     if_c jmp #.flush_tx
+     ret
+
+  input_character       res 1
+  compare_character     res 1
+  buffer_pointer        res 1
+  command_pointer       res 1
+  message_pointer       res 1
+  input_buffer_array    res 10
+
+  cmd_hello   byte "hello",0
+  msg_world   byte "p2asm",13,10,0

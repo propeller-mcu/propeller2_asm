@@ -1,0 +1,41 @@
+'cog_memoryflip.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000 / 2
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    wrbyte #"+", #shared_char
+
+    coginit #1, ##@swap_char
+    waitx ##DELAY
+
+    rdbyte working_value, ##shared_char
+    wypin working_value, ##TRANSMISSION_PIN
+
+    jmp #endprog
+
+  swap_char
+    rdbyte working_value, ##shared_char
+    cmp working_value, #"-" wz
+    if_z mov working_value, #"+"
+    if_nz mov working_value, #"-"
+    wrbyte working_value, ##shared_char
+    cogstop #1
+
+  endprog
+
+  working_value  res 1
+  shared_char    byte 0

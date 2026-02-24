@@ -1,0 +1,34 @@
+'multi_rdbyte.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  mov char_ptr, ##@character
+
+  read_loop
+    rdbyte current_char, char_ptr
+    cmp    current_char, #0 wz
+    if_z   jmp #done
+    wypin  current_char, #TRANSMISSION_PIN
+    waitx ##DELAY
+    add    char_ptr, #1
+    jmp    #read_loop
+    done
+
+  character     byte "A", "B", "C", "D", 0
+  char_count    res 1
+  current_char  res 1
+  char_ptr      res 1

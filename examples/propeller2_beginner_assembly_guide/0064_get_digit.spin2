@@ -1,0 +1,71 @@
+'get_digit.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+dat
+  org 0
+  asmclk
+
+  wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+  wxpin   ##BAUD_MODE, #RECEPTION_PIN
+  dirh    #RECEPTION_PIN
+
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+        
+  main
+    .get_input
+      testp   #RECEPTION_PIN wc
+      if_nc  jmp     #.get_input
+      
+      rdpin   input_character, #RECEPTION_PIN
+      shr     input_character, #24
+      and     input_character, #$FF
+      akpin   #RECEPTION_PIN
+
+      wypin   input_character, #TRANSMISSION_PIN
+      call    #.flush_transmission
+      cmp     input_character, #"0" wc
+      if_c   jmp     #.not_number
+      cmp     input_character, #"9" wz,wc
+      if_a   jmp     #.not_number
+     
+      mov     string_pointer, ##@msg_number
+      call    #.print_string
+      jmp     #.done
+
+    .not_number
+      mov     string_pointer, ##@msg_notnum
+      call    #.print_string
+    .done
+    jmp     #.get_input
+
+  .print_string
+  .nextch
+    rdbyte  current_byte, string_pointer
+    cmp     current_byte, #0 wz
+    if_z   ret
+    wypin   current_byte, #TRANSMISSION_PIN
+    call    #.flush_transmission
+    add     string_pointer, #1
+    jmp     #.nextch
+
+  .flush_transmission
+    rdpin   transmission_busy, #TRANSMISSION_PIN wc
+    if_c   jmp     #.flush_transmission
+    ret
+
+  input_character    res 1
+  current_byte       res 1
+  transmission_busy  res 1
+  string_pointer     res 1
+
+  msg_number     byte 13,10,"It is a number from 0 to 9",13,10,0
+  msg_notnum     byte 13,10,"Not a number!",13,10,0

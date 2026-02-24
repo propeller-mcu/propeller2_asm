@@ -1,0 +1,93 @@
+'decimal_to_string2.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov result, ##994421
+    mov ptra, ##@testStr
+
+    call #decToStr
+    mov ptra, ##@testStr
+    call #printStr
+
+    jmp #endprog
+
+  decToStr
+    cmp result, #0 wz
+    if_z jmp #.zero_case
+
+    mov string_start_pointer, ptra
+    mov quotient, result
+
+    .digit_loop
+      qdiv quotient, #10
+      getqx quotient
+      getqy current_char
+      add current_char, #"0"
+      wrbyte  current_char, ptra
+      add ptra, #1
+      cmp quotient, #0 wz
+      if_nz jmp #.digit_loop
+      wrbyte  #0, ptra
+      mov string_left_index, string_start_pointer
+      sub ptra, #1
+    .reverse_loop
+      cmp string_left_index, ptra wc
+      if_nc ret
+      rdbyte current_char, string_left_index
+      rdbyte string_right_index, ptra
+      wrbyte string_right_index, string_left_index
+      wrbyte current_char, ptra
+      add string_left_index, #1
+      sub ptra, #1
+      jmp #.reverse_loop
+    .zero_case
+      mov ptra, string_start_pointer
+      mov current_char, #"0"
+      wrbyte current_char, ptra
+      add ptra, #1
+      wrbyte  #0, ptra
+    ret
+
+  printStr
+    .loop
+      rdbyte  current_char, ptra
+      cmp     current_char, #0 wz
+      if_z    ret
+      call    #tx_char
+      add     ptra, #1
+      jmp #.loop
+
+  tx_char
+    wypin   current_char, #TRANSMISSION_PIN
+    waitx   ##DELAY
+    ret
+
+  endprog
+
+  testStr byte "", 0
+  digit res 1
+  divisor res 1
+  tmp res 1
+  number res 1
+  leading_zero  res 1
+  result  res 1
+  current_char res 1
+  string_start_pointer res 1
+  quotient res 1
+  string_left_index res 1
+  string_right_index res 1

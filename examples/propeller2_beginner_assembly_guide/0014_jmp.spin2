@@ -1,0 +1,28 @@
+'jmp.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  jmp     #larger_value:
+
+  smaller_value:
+    mov     number1, #2
+
+  larger_value:
+    mov     number1, #4
+    add     number1, #"0"
+    wypin   number1, #TRANSMISSION_PIN
+
+  number1 res 1

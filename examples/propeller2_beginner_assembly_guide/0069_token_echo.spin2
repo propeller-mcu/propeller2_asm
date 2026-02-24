@@ -1,0 +1,167 @@
+'token_echo.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+  wxpin   ##BAUD_MODE, #RECEPTION_PIN
+  dirh    #RECEPTION_PIN
+
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+
+  main
+    mov input_buffer_arg, #input_buffer
+    mov max_length, #32
+    call #read_line
+
+    mov buffer_pointer, #input_buffer
+    call #parse_two_tokens
+
+    mov compare_ptr, #@cmd_echo
+    mov string_pointer, token1_ptr
+
+  .check_token1
+    rdbyte input_character, string_pointer
+    rdbyte compare_character, compare_ptr
+    cmp input_character, compare_character wz
+    if_nz jmp #main
+    cmp input_character, #0 wz
+    if_z jmp #.send_token2
+    add string_pointer, #1
+    add compare_ptr, #1
+    jmp #.check_token1
+
+  .send_token2
+    mov input_buffer_arg, token2_ptr
+    call #send_string
+    jmp #main
+
+  parse_two_tokens
+    mov token1_ptr, buffer_pointer
+    mov token2_ptr, #0
+
+  .loop1
+    rdbyte input_character, buffer_pointer
+    cmp input_character, #0 wz
+    if_z jmp #.done_tokens
+    cmp input_character, ##32 wz
+    if_z jmp #.found_space1
+    add buffer_pointer, #1
+    jmp #.loop1
+
+  .found_space1
+    wrbyte #0, buffer_pointer
+    add buffer_pointer, #1
+    mov token2_ptr, buffer_pointer
+
+  .skip_spaces
+    rdbyte input_character, buffer_pointer
+    cmp input_character, ##32 wz
+    if_z add buffer_pointer, #1
+    if_nz jmp #.done_tokens
+    jmp #.skip_spaces
+
+  .done_tokens
+  ret
+
+  read_line
+    mov buffer_pointer, input_buffer_arg
+    mov character_count, #0
+
+  .read_char
+    testp #RECEPTION_PIN wc
+    if_nc jmp #.read_char
+
+    rdpin input_character, #RECEPTION_PIN
+    akpin #RECEPTION_PIN
+
+    shr input_character, #24
+    and input_character, #$FF
+
+    cmp input_character, ##$0D wz
+    if_z jmp #.line_done
+
+    cmp input_character, ##$08 wz
+    if_z jmp #.handle_backspace
+
+    cmp input_character, ##$7F wz
+    if_z jmp #.handle_backspace
+
+    cmp character_count, max_length wz
+    if_z jmp #.read_char
+
+    wypin input_character, #TRANSMISSION_PIN
+    call #flush_tx
+
+    wrbyte input_character, buffer_pointer
+    add buffer_pointer, #1
+    add character_count, #1
+    jmp #.read_char
+
+  .handle_backspace
+    cmp character_count, #0 wz
+    if_z jmp #.read_char
+
+    sub buffer_pointer, #1
+    sub character_count, #1
+
+    wypin ##$08, #TRANSMISSION_PIN
+    call #flush_tx
+    wypin ##32, #TRANSMISSION_PIN
+    call #flush_tx
+    wypin ##$08, #TRANSMISSION_PIN
+    call #flush_tx
+
+    jmp #.read_char
+
+  .line_done
+    wrbyte #0, buffer_pointer
+    wypin ##$0D, #TRANSMISSION_PIN
+    call #flush_tx
+    wypin ##$0A, #TRANSMISSION_PIN
+    call #flush_tx
+  ret
+
+  send_string
+    mov string_pointer, input_buffer_arg
+  .loop_send
+    rdbyte input_character, string_pointer
+    cmp input_character, #0 wz
+    if_z jmp #.done_send
+    wypin input_character, #TRANSMISSION_PIN
+    call #flush_tx
+    add string_pointer, #1
+    jmp #.loop_send
+  .done_send
+  ret
+
+  flush_tx
+    rdpin transmission_busy, #TRANSMISSION_PIN wc
+    if_c jmp #flush_tx
+    ret
+
+  input_character     res 1
+  compare_character   res 1
+  transmission_busy   res 1
+  buffer_pointer      res 1
+  character_count     res 1
+  input_buffer_arg    res 1
+  max_length          res 1
+  string_pointer      res 1
+  token1_ptr          res 1
+  token2_ptr          res 1
+  input_buffer        res 32
+  compare_ptr         res 1
+  
+  cmd_echo byte "echo", 0

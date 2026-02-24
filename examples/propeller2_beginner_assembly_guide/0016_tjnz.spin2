@@ -1,0 +1,34 @@
+'tjnz.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  mov     number1, #5
+
+  count_loop
+    tjnz    number1, #process_number
+    jmp     #done
+
+  process_number
+    mov     ascii_number, number1
+    add     ascii_number, #"0"
+    sub     number1, #1
+    jmp     #count_loop
+
+  done
+    wypin   ascii_number, #TRANSMISSION_PIN
+
+  number1 res 1
+  ascii_number res 1

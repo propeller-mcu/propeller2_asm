@@ -1,0 +1,47 @@
+'string_number_length.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov stringPointer, ##@mystring
+    call #get_string_length
+
+    add string_length, #"0"
+    wypin string_length, #TRANSMISSION_PIN
+
+    jmp     #endprog
+
+  get_string_length
+    mov string_length, #0
+    mov string_limit, #9
+    .loop
+        rdbyte  currentChar, stringPointer
+        cmp     currentChar, #0 wz
+        if_z    ret
+        cmp     string_limit, string_length wz
+        if_z    ret
+        add     string_length, #1
+        add     stringPointer, #1
+    jmp     #.loop
+
+  endprog
+
+  string_length    res 1
+  string_limit     res 1
+  currentChar      res 1
+  stringPointer    res 1
+
+  mystring         byte "Hello!",0

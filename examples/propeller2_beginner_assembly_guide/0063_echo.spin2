@@ -1,0 +1,34 @@
+'echo.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+        
+  wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+  wxpin   ##BAUD_MODE, #RECEPTION_PIN
+  dirh    #RECEPTION_PIN
+
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+
+  main
+  .echo_loop
+    testp   #RECEPTION_PIN wc
+    if_nc  jmp     #.echo_loop
+    rdpin   reception_byte, #RECEPTION_PIN
+    shr     reception_byte, #24
+    and     reception_byte, #255
+    akpin   #RECEPTION_PIN
+    wypin   reception_byte, #TRANSMISSION_PIN
+    jmp     #.echo_loop
+
+  reception_byte    res 1

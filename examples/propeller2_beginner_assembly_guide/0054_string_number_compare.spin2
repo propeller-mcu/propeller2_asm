@@ -1,0 +1,64 @@
+'string_number_compare.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov stringPointer1, ##@mystring1
+    mov stringPointer2, ##@mystring2
+    mov compareLength, #6
+    call #string_n_compare
+    
+    add stringResult, #"0"
+    wypin stringResult, #TRANSMISSION_PIN
+
+    jmp     #endprog
+
+  string_n_compare
+    .loop
+      cmp     compareLength, #0 wz
+      if_z    jmp     #.same
+
+      rdbyte  currentChar1, stringPointer1
+      rdbyte  currentChar2, stringPointer2
+      cmp     currentChar1, currentChar2 wz
+      if_nz   jmp     #.different
+      cmp     currentChar1, #0 wz
+      if_z    jmp     #.same
+
+      add     stringPointer1, #1
+      add     stringPointer2, #1
+      sub     compareLength, #1
+      jmp     #.loop
+
+    .same
+      mov     stringResult, #0
+  ret
+
+    .different
+      mov     stringResult, #1
+  ret
+
+  endprog
+
+  currentChar1     res 1
+  currentChar2     res 1
+  stringPointer1   res 1
+  stringPointer2   res 1
+  stringResult     res 1
+  compareLength    res 1
+
+  mystring1        byte "Hello!",0
+  mystring2        byte "Hello?",0

@@ -1,0 +1,133 @@
+'spi_display_jedec.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  RECEPTION_PIN     = 63
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+  SPI_CS   = 61
+  SPI_CLK  = 60
+  SPI_MOSI = 59
+  SPI_MISO = 58
+
+  SPI_CLK_MODE = P_TRANSITION + P_OE
+  SPI_MOSI_MODE = P_SYNC_TX + P_OE | ((SPI_CLK - SPI_MOSI) & %111) << 24
+  SPI_MISO_MODE = P_SYNC_RX | ((SPI_CLK - SPI_MISO) & %111) << 24
+  SPI_CLK_DIV = (_CLKFREQ / 100_000_000) #> 4
+  
+  SPI_8BIT_CONTROL = $27
+
+DAT
+  org 0
+  asmclk
+  
+  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin   #1, #TRANSMISSION_PIN
+  dirh    #TRANSMISSION_PIN
+  
+  wrpin   ##SPI_CLK_MODE, #SPI_CLK
+  wrpin   ##SPI_MOSI_MODE, #SPI_MOSI
+  wrpin   ##SPI_MISO_MODE, #SPI_MISO
+  wxpin   ##SPI_CLK_DIV, #SPI_CLK
+  drvl    #SPI_CLK
+  
+  wxpin   ##SPI_8BIT_CONTROL, #SPI_MOSI
+  wxpin   ##SPI_8BIT_CONTROL, #SPI_MISO
+  
+  call    #print_jedec
+  
+  jmp     #endprog
+
+
+  print_jedec
+    drvl    #SPI_CS
+    
+    mov spi_command, #$9F
+    call #spi_transmit
+        
+    call #spi_receive
+    mov     pr0, spi_reception
+    call    #print_hex_byte
+    mov     uart_transmission, #" "
+    call    #uart_transmit_char
+    
+    call #spi_receive
+    mov     pr0, spi_reception
+    call    #print_hex_byte
+    mov     uart_transmission, #" "
+    call    #uart_transmit_char
+    
+    call #spi_receive
+    mov     pr0, spi_reception
+    call    #print_hex_byte
+    mov     uart_transmission, #" "
+    call    #uart_transmit_char
+    
+    drvh    #SPI_CS
+    
+    mov     uart_transmission, #13
+    call    #uart_transmit_char
+    mov     uart_transmission, #10
+    call    #uart_transmit_char    
+  ret
+
+  spi_transmit
+    shl spi_command,#24
+    rev spi_command
+    
+    wypin spi_command,#SPI_MOSI
+    drvl #SPI_MOSI
+    
+    wypin #16,#SPI_CLK
+
+    .waitRdy
+      testp #SPI_CLK wz
+      if_nz jmp #.waitRdy
+    ret
+
+  spi_receive
+    drvl    #SPI_MISO
+    fltl    #SPI_MOSI
+   wypin   #16,#SPI_CLK
+  .waitDone
+    testp   #SPI_MISO wz
+    if_nz   jmp #.waitDone
+    rdpin   spi_reception,#SPI_MISO
+    rev     spi_reception
+    zerox   spi_reception,#7
+    ret  
+
+  print_hex_byte
+    mov hexadecimal_copy, pr0
+    shr pr0, #4
+    and pr0, #$F
+    call #print_nibble
+    mov pr0, hexadecimal_copy
+    and pr0, #$F
+    call #print_nibble
+    ret
+
+  print_nibble
+    cmp pr0, #10 wc
+    if_b add pr0, #"0"
+    if_nc add pr0, #"A"-10
+    mov uart_transmission, pr0
+    call #uart_transmit_char
+    ret
+
+  uart_transmit_char
+    wypin   uart_transmission, #TRANSMISSION_PIN
+    .txwait
+    rdpin   pr2, #TRANSMISSION_PIN wc
+    if_c    jmp #.txwait
+    ret
+
+  endprog
+
+  spi_command         res 1
+  spi_reception       res 1
+  uart_transmission   res 1
+  hexadecimal_copy    res 1

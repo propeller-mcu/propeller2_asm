@@ -1,0 +1,89 @@
+'string_number_concatenate.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = 180_000_000
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  
+  main
+    mov sourcePointer2, #@mystring2
+    mov destinationPointer, #@mystring3
+    call #string_copy
+
+    mov sourcePointer1, #@mystring1
+    mov destinationPointer, #@mystring3
+    mov maxAppendCount, #2
+    call #string_n_concat
+
+    mov transmitPointer, #@mystring3
+    .loop_transmit
+      rdbyte  currentChar, transmitPointer
+      cmp     currentChar, #0 wz
+      if_z    jmp #endprog
+      wypin   currentChar, #TRANSMISSION_PIN
+      waitx ##DELAY
+      add     transmitPointer, #1
+      jmp #.loop_transmit
+
+    jmp #endprog
+
+  string_copy
+    .loop_copy
+      rdbyte currentChar, sourcePointer2
+      wrbyte currentChar, destinationPointer
+      add sourcePointer2, #1
+      add destinationPointer, #1
+      cmp currentChar, #0 wz
+      if_z ret
+      jmp #.loop_copy
+
+  string_n_concat
+    .loop_find_end
+      rdbyte currentChar, destinationPointer
+      cmp currentChar, #0 wz
+      if_z jmp #.append_start
+      add destinationPointer, #1
+      jmp #.loop_find_end
+
+    .append_start
+      .loop_append
+        cmp maxAppendCount, #0 wz
+        if_z jmp #.null_terminate
+
+        rdbyte currentChar, sourcePointer1
+        cmp currentChar, #0 wz
+        if_z jmp #.null_terminate
+        wrbyte currentChar, destinationPointer
+        add sourcePointer1, #1
+        add destinationPointer, #1
+        sub maxAppendCount, #1
+        jmp #.loop_append
+
+    .null_terminate
+      mov     currentChar, #0
+      wrbyte  currentChar, destinationPointer
+  ret
+
+  endprog
+
+  currentChar         res 1
+  sourcePointer1      res 1
+  sourcePointer2      res 1
+  destinationPointer  res 1
+  transmitPointer     res 1
+  maxAppendCount      res 1
+
+  mystring1           byte "World!",0
+  mystring2           byte "Hello,",0,0,0,0,0,0
+  mystring3           byte 256
