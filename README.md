@@ -18,7 +18,7 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 - [Parallax Forums](https://forums.parallax.com/) – Community discussion and support  
 - [FlexProp](https://github.com/totalspectrum/flexprop/) – Software used for Propeller development
 
-Updates
+## Updates
 02/24/2026
   All examples now explicitly terminate with:
   endprog
