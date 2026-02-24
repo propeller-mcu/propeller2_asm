@@ -17,3 +17,11 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 - [Parallax Website](https://www.parallax.com/) – Official Propeller 2 info and documentation  
 - [Parallax Forums](https://forums.parallax.com/) – Community discussion and support  
 - [FlexProp](https://github.com/totalspectrum/flexprop/) – Software used for Propeller development
+
+Updates
+02/24/2026
+  All examples now explicitly terminate with:
+  endprog
+      jmp #$
+  This prevents the cog from executing into variable (res) memory. 
+  Ensures stable PST behavior and avoids stale RAM execution.
