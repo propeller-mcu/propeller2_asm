@@ -38,3 +38,7 @@ This prevents execution into variable (`res`) memory and ensures stable PST beha
 #### Simclk Removal Update
 
 References to the obsolete simclk variable have been removed from all examples. Timing in spin-wait loops and SmartPin routines now relies entirely on real instruction cycles and the system clock (_CLKFREQ), as handled automatically by the compiler or, optionally, asmclk.
+
+#### WAITX / NOP Instruction Timing Correction
+
+In the “WAITX vs NOP” topic, the previous statement that instructions execute in one clock cycle has been corrected. On final Propeller 2 hardware, all base instructions take two clock cycles. This affects timing calculations for spin-wait loops, SmartPin delays, and bit-banging routines.
