@@ -51,4 +51,4 @@ In the “WAITX vs NOP” topic, the previous statement that instructions execut
 - Tested all programs with FlexProp and the Spin IDE to ensure full compatibility.
 - Updated the comparison / if_* Instructions chapter to include the new if_a instruction.
 - Added explanation of the wcz flags in the comparison section for clarity.
-Revised the Decimal to String section to revisit the routine and include a detailed explanation of the ptra register and its role in memory operations
+- Revised the Decimal to String section to include an explanation of the ptra register and its role in memory operations
