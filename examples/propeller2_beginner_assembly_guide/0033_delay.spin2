@@ -27,4 +27,7 @@ DAT
   mov character, #"B"
   wypin character, #TRANSMISSION_PIN
 
+  endprog
+    jmp  #$
+
   character res 1

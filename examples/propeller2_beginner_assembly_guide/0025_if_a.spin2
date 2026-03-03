@@ -1,4 +1,4 @@
-'if_z.spin2
+' if_a.spin2
 CON
   _CLKFREQ          = 180_000_000
   BAUD_RATE         = 2_000_000
@@ -15,18 +15,19 @@ DAT
   wypin   #1, #TRANSMISSION_PIN
   dirh    #TRANSMISSION_PIN
 
-  mov     isEqual, #0
-  mov     number1, #2
-  mov     number2, #2
 
-  cmp     number1, number2 wz
-  if_z    mov     isEqual, #"1"
+  mov isGreater, #0
+  mov     number1, #8
+  mov     number2, #4
 
-  wypin   isEqual, #TRANSMISSION_PIN
+  cmp     number1, number2 wcz
+  if_a    mov isGreater, #"1"
+
+  wypin   isGreater, #TRANSMISSION_PIN
 
   endprog
     jmp  #$
 
-  number1 res 1
-  number2 res 1
-  isEqual res 1
+  number1  res 1
+  number2  res 1
+  isGreater res 1

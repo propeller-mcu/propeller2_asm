@@ -27,6 +27,9 @@ DAT
     add    char_ptr, #1
     jmp    #read_loop
     done
+    
+  endprog
+    jmp  #$
 
   character     byte "A", "B", "C", "D", 0
   char_count    res 1

@@ -14,13 +14,13 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov stringPointer1, ##@mystring1
     mov stringPointer2, ##@mystring2
     mov compareLength, #6
     call #string_n_compare
-    
+
     add stringResult, #"0"
     wypin stringResult, #TRANSMISSION_PIN
 
@@ -52,6 +52,10 @@ DAT
   ret
 
   endprog
+    jmp  #$
+
+  mystring1        byte "Hello!",0, 0
+  mystring2        byte "Hello?",0
 
   currentChar1     res 1
   currentChar2     res 1
@@ -59,6 +63,3 @@ DAT
   stringPointer2   res 1
   stringResult     res 1
   compareLength    res 1
-
-  mystring1        byte "Hello!",0
-  mystring2        byte "Hello?",0

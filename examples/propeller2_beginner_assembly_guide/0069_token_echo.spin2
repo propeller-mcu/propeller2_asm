@@ -151,6 +151,11 @@ DAT
     if_c jmp #flush_tx
     ret
 
+  endprog
+    jmp  #$
+
+  cmd_echo byte "echo", 0
+
   input_character     res 1
   compare_character   res 1
   transmission_busy   res 1
@@ -161,7 +166,5 @@ DAT
   string_pointer      res 1
   token1_ptr          res 1
   token2_ptr          res 1
-  input_buffer        res 32
   compare_ptr         res 1
-  
-  cmd_echo byte "echo", 0
+  input_buffer        res 32

@@ -19,12 +19,12 @@ dat
   wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
   wypin   #1, #TRANSMISSION_PIN
   dirh    #TRANSMISSION_PIN
-        
+
   main
     .get_input
       testp   #RECEPTION_PIN wc
       if_nc  jmp     #.get_input
-      
+
       rdpin   input_character, #RECEPTION_PIN
       shr     input_character, #24
       and     input_character, #$FF
@@ -36,7 +36,7 @@ dat
       if_c   jmp     #.not_number
       cmp     input_character, #"9" wz,wc
       if_a   jmp     #.not_number
-     
+
       mov     string_pointer, ##@msg_number
       call    #.print_string
       jmp     #.done
@@ -62,10 +62,12 @@ dat
     if_c   jmp     #.flush_transmission
     ret
 
+  endprog
+    jmp  #$
+
+  msg_number     byte 13,10,"It is a number from 0 to 9",13,10,0,0
+  msg_notnum     byte 13,10,"Not a number!",13,10,0
   input_character    res 1
   current_byte       res 1
   transmission_busy  res 1
   string_pointer     res 1
-
-  msg_number     byte 13,10,"It is a number from 0 to 9",13,10,0
-  msg_notnum     byte 13,10,"Not a number!",13,10,0

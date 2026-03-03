@@ -55,8 +55,8 @@ flush
     if_nz jmp #.delay
     ret
 
-
   endprog
+    jmp  #$
 
   number1   res 1
   ascii_out res 1

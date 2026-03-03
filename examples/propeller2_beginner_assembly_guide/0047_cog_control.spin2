@@ -32,5 +32,6 @@ DAT
     ret
     
   endprog
+    jmp  #$
 
   cog_number res 1

@@ -10,21 +10,21 @@ CON
 DAT
   org 0
   asmclk
-  
+
   wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
   wxpin   ##BAUD_MODE, #RECEPTION_PIN
   dirh    #RECEPTION_PIN
-  
+
   wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
   wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
   wypin   #1, #TRANSMISSION_PIN
   dirh    #TRANSMISSION_PIN
-  
+
   main
     mov input_buffer_arg, #input_buffer
     mov max_buffer_length, #32
     call #read_line
-    
+
     mov compare_pointer, #@cmd_hello
     mov buffer_pointer, #input_buffer
 
@@ -46,11 +46,11 @@ DAT
 
   skip_response
     jmp #main
-    
+
   read_line
     mov buffer_pointer, input_buffer_arg
     mov character_count, #0
-    
+
     read_char
       testp #RECEPTION_PIN wc
       if_nc jmp #read_char
@@ -58,14 +58,15 @@ DAT
       shr input_character, #24
       and input_character, #$FF
       akpin #RECEPTION_PIN
-      
+
       cmp input_character, ##$0D wz
       if_z   jmp #line_done
       cmp input_character, ##$08 wz
       if_z   jmp #handle_backspace
-      
+
       wypin input_character, #TRANSMISSION_PIN
       call #flush_transmission
+
       cmp character_count, max_buffer_length wz
       if_z jmp #read_char
       wrbyte input_character, buffer_pointer
@@ -90,26 +91,31 @@ DAT
     wypin ##$0A, #TRANSMISSION_PIN
     call #flush_transmission
     ret
-    
-  send_string
-    mov string_pointer, input_buffer_arg
-    loop_send
-      rdbyte output_character, string_pointer
-      cmp output_character, #0 wz
-      if_z jmp #done_send
-      wypin output_character, #TRANSMISSION_PIN
-      call #flush_transmission
-      add string_pointer, #1
-      jmp #loop_send
-  
-  done_send
+
+send_string
+  mov string_pointer, input_buffer_arg
+loop_send
+  rdbyte output_character, string_pointer
+  cmp output_character, #0 wz
+  if_z jmp #done_send
+  wypin output_character, #TRANSMISSION_PIN
+  call #flush_transmission
+  add string_pointer, #1
+  jmp #loop_send
+done_send
   ret
 
   flush_transmission
     rdpin transmission_busy, #TRANSMISSION_PIN wc
     if_c jmp #flush_transmission
     ret
-    
+
+  endprog
+    jmp  #$
+
+  cmd_hello byte "hello", 0, 0, 0
+  msg_world byte "p2 assembly!", 0
+
   input_character       res 1
   compare_character     res 1
   output_character      res 1
@@ -121,6 +127,3 @@ DAT
   compare_pointer       res 1
   transmission_busy     res 1
   input_buffer          res 32
-
-  cmd_hello byte "hello", 0
-  msg_world byte "p2 assembly!", 0

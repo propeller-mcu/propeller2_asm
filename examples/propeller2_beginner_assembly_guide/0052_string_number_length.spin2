@@ -14,7 +14,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov stringPointer, ##@mystring
     call #get_string_length
@@ -38,10 +38,10 @@ DAT
     jmp     #.loop
 
   endprog
+    jmp  #$
 
+  mystring         byte "Hello!",0
   string_length    res 1
   string_limit     res 1
   currentChar      res 1
   stringPointer    res 1
-
-  mystring         byte "Hello!",0

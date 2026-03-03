@@ -5,6 +5,7 @@ CON
   TRANSMISSION_PIN  = 62
   BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
   BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+  DELAY             = _CLKFREQ
 
 DAT
   org 0
@@ -14,7 +15,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov     sourcePointer, #@mystring1
     mov     destinationPointer, #@mystring2
@@ -43,10 +44,11 @@ DAT
       jmp #.loop
 
   endprog
+    jmp  #$
+
+  mystring1           byte "Hello!",0, 0
+  mystring2           byte 0,0,0,0,0,0       ' enough space for copy
 
   currentChar         res 1
   sourcePointer       res 1
   destinationPointer  res 1
-
-  mystring1           byte "Hello!",0
-  mystring2           byte 0,0,0,0,0,0,0       ' enough space for copy

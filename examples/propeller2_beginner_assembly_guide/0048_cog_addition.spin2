@@ -15,13 +15,13 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
-    coginit #1, ##@addition           
+    coginit #1, ##@addition
 
     waitx   ##DELAY
 
-    rdword  calculation_result, ##@calculation_result_hub            
+    rdword  calculation_result, ##@calculation_result_hub
     add     calculation_result, #"0"
     wypin   calculation_result, #TRANSMISSION_PIN
 
@@ -35,6 +35,8 @@ DAT
     ret
 
   endprog
+    jmp  #$
 
-  calculation_result      res 1
   calculation_result_hub  word 0
+  calculation_result      res 1
+

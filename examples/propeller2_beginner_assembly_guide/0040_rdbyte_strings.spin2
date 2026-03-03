@@ -28,6 +28,9 @@ DAT
     jmp    #read_loop
     done
 
+  endprog
+    jmp  #$
+
 character      byte "Hello assembly!", 0
 char_count     res 1
 current_char   res 1

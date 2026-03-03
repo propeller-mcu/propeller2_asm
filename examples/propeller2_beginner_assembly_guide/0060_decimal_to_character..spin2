@@ -30,7 +30,8 @@ DAT
     mov asciiChar, number
     ret
       
-  endprog        
+  endprog
+    jmp  #$      
 
   asciiChar   res 1
   number      res 1

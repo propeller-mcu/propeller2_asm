@@ -90,6 +90,9 @@ DAT
     if_c    jmp #flush_tx
     ret
     
+  endprog
+    jmp  #$
+    
   input_character      res 1
   transmission_busy    res 1
   buffer_pointer       res 1

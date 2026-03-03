@@ -15,7 +15,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov sourcePointer1, #@mystring2
     mov destinationPointer, #@mystring3
@@ -66,6 +66,7 @@ DAT
         jmp #.loop_append
 
   endprog
+    jmp  #$
 
   currentChar         res 1
   sourcePointer1      res 1
@@ -73,6 +74,6 @@ DAT
   destinationPointer  res 1
   transmitPointer     res 1
 
-  mystring1           byte "World!",0
+  mystring1           byte "World!",0, 0
   mystring2           byte "Hello,",0,0,0,0,0,0
   mystring3           byte 256

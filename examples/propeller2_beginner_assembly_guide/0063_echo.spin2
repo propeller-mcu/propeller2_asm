@@ -31,4 +31,7 @@ DAT
     wypin   reception_byte, #TRANSMISSION_PIN
     jmp     #.echo_loop
 
+  endprog
+    jmp  #$
+
   reception_byte    res 1

@@ -21,6 +21,9 @@ DAT
   rdlong  number_value, ##@number1
   add number_value, #"0"
   wypin   number_value, #TRANSMISSION_PIN
+  
+  endprog
+    jmp  #$
 
   number1       long 0
   number_value  res 1

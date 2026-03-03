@@ -1,0 +1,166 @@
+00000                 | 
+00000                 | #line 1 "/Users/kennethwanamaker/Downloads/flexprop/_pasm2/tutorial_final/0068_send_string.spin2"
+00000                 | 'send_string.spin2
+00000                 | CON
+00000                 |   _CLKFREQ          = 180_000_000
+00000                 |   BAUD_RATE         = 2_000_000
+00000                 |   TRANSMISSION_PIN  = 62
+00000                 |   RECEPTION_PIN     = 63
+00000                 |   BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+00000                 |   BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+00000                 | 
+00000                 | DAT
+00000 000             |   org 0
+00000 000 04 80 80 FF 
+00004 001 00 F0 65 FD |   hubset	##clkmode_ & !%11
+00008 002 86 01 80 FF 
+0000c 003 1F 80 66 FD | 	waitx	##20_000_000/100
+00010 004 04 80 80 FF 
+00014 005 00 F6 65 FD | 	hubset	##clkmode_
+00018 006             | 
+00018 006 08 00 80 FF 
+0001c 007 3F 7C 0C FC |   wrpin   ##(P_ASYNC_RX | P_HIGH_15K), #RECEPTION_PIN
+00020 008 00 2D 80 FF 
+00024 009 3F 0E 1C FC |   wxpin   ##BAUD_MODE, #RECEPTION_PIN
+00028 00a 41 7E 64 FD |   dirh    #RECEPTION_PIN
+0002c 00b             | 
+0002c 00b 00 00 80 FF 
+00030 00c 3E F8 0C FC |   wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+00034 00d 00 2D 80 FF 
+00038 00e 3E 0E 1C FC |   wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
+0003c 00f 3E 02 2C FC |   wypin   #1, #TRANSMISSION_PIN
+00040 010 41 7C 64 FD |   dirh    #TRANSMISSION_PIN
+00044 011             | 
+00044 011             |   main
+00044 011 63 BC 04 F6 |     mov input_buffer_arg, #input_buffer
+00048 012 20 BE 04 F6 |     mov max_buffer_length, #32
+0004c 013 3C 00 B0 FD |     call #read_line
+00050 014             | 
+00050 014 64 C3 04 F6 |     mov compare_pointer, #@cmd_hello
+00054 015 63 B8 04 F6 |     mov buffer_pointer, #input_buffer
+00058 016             | 
+00058 016             |   check_loop
+00058 016 5C B2 C0 FA |     rdbyte input_character, buffer_pointer
+0005c 017 61 B4 C0 FA |     rdbyte compare_character, compare_pointer
+00060 018 5A B2 08 F2 |     cmp input_character, compare_character wz
+00064 019 20 00 90 5D |     if_nz jmp #skip_response
+00068 01a 00 B2 0C F2 |     cmp input_character, #0 wz
+0006c 01b 0C 00 90 AD |     if_z  jmp #send_world
+00070 01c 01 B8 04 F1 |     add buffer_pointer, #1
+00074 01d 01 C2 04 F1 |     add compare_pointer, #1
+00078 01e DC FF 9F FD |     jmp #check_loop
+0007c 01f             | 
+0007c 01f             |   send_world
+0007c 01f 6C BD 04 F6 |     mov input_buffer_arg, #@msg_world
+00080 020 AC 00 B0 FD |     call #send_string
+00084 021 BC FF 9F FD |     jmp #main
+00088 022             | 
+00088 022             |   skip_response
+00088 022 B8 FF 9F FD |     jmp #main
+0008c 023             | 
+0008c 023             |   read_line
+0008c 023 5E B8 00 F6 |     mov buffer_pointer, input_buffer_arg
+00090 024 00 BA 04 F6 |     mov character_count, #0
+00094 025             | 
+00094 025             |     read_char
+00094 025 40 7E 74 FD |       testp #RECEPTION_PIN wc
+00098 026 F8 FF 9F 3D |       if_nc jmp #read_char
+0009c 027 3F B2 8C FA |       rdpin input_character, #RECEPTION_PIN
+000a0 028 18 B2 44 F0 |       shr input_character, #24
+000a4 029 FF B2 04 F5 |       and input_character, #$FF
+000a8 02a 3F 02 0C FC |       akpin #RECEPTION_PIN
+000ac 02b             | 
+000ac 02b 00 00 00 FF 
+000b0 02c 0D B2 0C F2 |       cmp input_character, ##$0D wz
+000b4 02d 5C 00 90 AD |       if_z   jmp #line_done
+000b8 02e 00 00 00 FF 
+000bc 02f 08 B2 0C F2 |       cmp input_character, ##$08 wz
+000c0 030 20 00 90 AD |       if_z   jmp #handle_backspace
+000c4 031             | 
+000c4 031             |       ' Uncomment these two lines for FlexProp
+000c4 031 3E B2 24 FC |        wypin input_character, #TRANSMISSION_PIN
+000c8 032 88 00 B0 FD |        call #flush_transmission
+000cc 033             | 
+000cc 033 5F BA 08 F2 |       cmp character_count, max_buffer_length wz
+000d0 034 C0 FF 9F AD |       if_z jmp #read_char
+000d4 035 5C B2 40 FC |       wrbyte input_character, buffer_pointer
+000d8 036 01 B8 04 F1 |       add buffer_pointer, #1
+000dc 037 01 BA 04 F1 |       add character_count, #1
+000e0 038 B0 FF 9F FD |       jmp #read_char
+000e4 039             | 
+000e4 039             |   handle_backspace
+000e4 039 00 BA 0C F2 |     cmp character_count, #0 wz
+000e8 03a A8 FF 9F AD |     if_z   jmp #read_char
+000ec 03b 01 B8 84 F1 |     sub buffer_pointer, #1
+000f0 03c 01 BA 84 F1 |     sub character_count, #1
+000f4 03d 00 00 80 FF 
+000f8 03e 3E 10 2C FC |     wypin ##$08, #TRANSMISSION_PIN
+000fc 03f 00 00 80 FF 
+00100 040 3E 40 2C FC |     wypin ##32, #TRANSMISSION_PIN
+00104 041 00 00 80 FF 
+00108 042 3E 10 2C FC |     wypin ##$08, #TRANSMISSION_PIN
+0010c 043 44 00 B0 FD |     call #flush_transmission
+00110 044 80 FF 9F FD |     jmp #read_char
+00114 045             | 
+00114 045             |   line_done
+00114 045 5C 00 48 FC |     wrbyte #0, buffer_pointer
+00118 046 00 00 80 FF 
+0011c 047 3E 1A 2C FC |     wypin ##$0D, #TRANSMISSION_PIN
+00120 048 00 00 80 FF 
+00124 049 3E 14 2C FC |     wypin ##$0A, #TRANSMISSION_PIN
+00128 04a 28 00 B0 FD |     call #flush_transmission
+0012c 04b 2D 00 64 FD |     ret
+00130 04c             | 
+00130 04c             | send_string
+00130 04c 5E C0 00 F6 |   mov string_pointer, input_buffer_arg
+00134 04d             | loop_send
+00134 04d 60 B6 C0 FA |   rdbyte output_character, string_pointer
+00138 04e 00 B6 0C F2 |   cmp output_character, #0 wz
+0013c 04f 10 00 90 AD |   if_z jmp #done_send
+00140 050 3E B6 24 FC |   wypin output_character, #TRANSMISSION_PIN
+00144 051 0C 00 B0 FD |   call #flush_transmission
+00148 052 01 C0 04 F1 |   add string_pointer, #1
+0014c 053 E4 FF 9F FD |   jmp #loop_send
+00150 054             | done_send
+00150 054 2D 00 64 FD |   ret
+00154 055             | 
+00154 055             |   flush_transmission
+00154 055 3E C4 9C FA |     rdpin transmission_busy, #TRANSMISSION_PIN wc
+00158 056 F8 FF 9F CD |     if_c jmp #flush_transmission
+0015c 057 2D 00 64 FD |     ret
+00160 058             | 
+00160 058             |   endprog
+00160 058 FC FF 9F FD |     jmp  #$
+00164 059             | 
+00164 059             |   input_character       res 1
+00164 059 
+00164 05a             |   compare_character     res 1
+00164 05a 
+00164 05b             |   output_character      res 1
+00164 05b 
+00164 05c             |   buffer_pointer        res 1
+00164 05c 
+00164 05d             |   character_count       res 1
+00164 05d 
+00164 05e             |   input_buffer_arg      res 1
+00164 05e 
+00164 05f             |   max_buffer_length     res 1
+00164 05f 
+00164 060             |   string_pointer        res 1
+00164 060 
+00164 061             |   compare_pointer       res 1
+00164 061 
+00164 062             |   transmission_busy     res 1
+00164 062 
+00164 063             |   input_buffer          res 32
+00164 063 
+00164 083             | 
+00164 083             |   cmd_hello byte "hello", 0, 0, 0
+00164 083 68 65 6C 6C 
+00168 084 6F 00 00 00 
+0016c 085             |   msg_world byte "p2 assembly!", 0
+0016c 085 70 32 20 61 
+00170 086 73 73 65 6D 
+00174 087 62 6C 79 21 
+00178 088 00 
+00179 088             | 

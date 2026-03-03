@@ -30,6 +30,9 @@ DAT
     .end
 
   wypin   #"#", #TRANSMISSION_PIN
+  
+  endprog
+    jmp  #$
 
   timeout       res 1
   counter       res 1

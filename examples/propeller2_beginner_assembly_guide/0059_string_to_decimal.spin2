@@ -15,7 +15,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov stringPointer, ##@testStr
     call #strToDec
@@ -27,13 +27,14 @@ DAT
     jmp     #endprog
 
   strToDec
-    rdbyte  currentChar, stringPointer 
+    rdbyte  currentChar, stringPointer
     sub     currentChar, #"0"
     mov     numericValue, currentChar
     ret
-        
-  endprog        
-        
+
+  endprog
+    jmp  #$
+
   testStr byte "3", 0
 
   numericValue      res 1

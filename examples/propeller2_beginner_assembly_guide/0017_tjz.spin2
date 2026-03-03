@@ -27,5 +27,8 @@ DAT
   done
       wypin   ascii_flag, #TRANSMISSION_PIN
 
+  endprog
+    jmp  #$
+    
   number1 res 1
   ascii_flag  res 1

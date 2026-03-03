@@ -15,7 +15,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     wrbyte #"+", #shared_char
 
@@ -36,6 +36,8 @@ DAT
     cogstop #1
 
   endprog
+    jmp  #$
 
-  working_value  res 1
   shared_char    byte 0
+  working_value  res 1
+

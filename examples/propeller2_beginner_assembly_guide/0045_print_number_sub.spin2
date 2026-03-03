@@ -45,6 +45,9 @@ DAT
   mov     digit, value
   add     digit, #"0"
   wypin   digit, #TRANSMISSION_PIN
+  
+  endprog
+    jmp  #$
 
   number1        long 0
   number_store   res 1

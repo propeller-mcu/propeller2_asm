@@ -21,5 +21,8 @@ DAT
   rdbyte data_byte, ##@character
   wypin  data_byte, #TRANSMISSION_PIN
 
+  endprog
+    jmp  #$
+
   character byte "A", 0, 0, 0
   data_byte      res 1

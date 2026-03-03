@@ -54,6 +54,7 @@ DAT
     cogstop working_value
 
   endprog
+    jmp  #$
 
   shared_counter   long 0
   working_value    res 1

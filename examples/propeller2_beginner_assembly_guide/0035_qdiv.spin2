@@ -24,5 +24,8 @@ DAT
   add     number1, #"0"
   wypin   number1, #TRANSMISSION_PIN
 
+  endprog
+    jmp  #$
+
   number1 res 1
   number2 res 1

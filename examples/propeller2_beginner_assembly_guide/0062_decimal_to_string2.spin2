@@ -15,7 +15,7 @@ DAT
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
   wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+
   main
     mov result, ##994421
     mov ptra, ##@testStr
@@ -78,8 +78,9 @@ DAT
     ret
 
   endprog
+    jmp  #$
 
-  testStr byte "", 0
+  testStr byte 0
   digit res 1
   divisor res 1
   tmp res 1

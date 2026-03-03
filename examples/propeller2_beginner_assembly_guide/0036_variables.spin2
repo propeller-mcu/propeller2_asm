@@ -26,6 +26,9 @@ DAT
   mov number2, #2
   add number2, #"0"
   wypin number2, #TRANSMISSION_PIN
+  
+  endprog
+    jmp  #$
 
   character byte "A", 0, 0, 0
   number1   word 0, 0

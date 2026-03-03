@@ -9,19 +9,23 @@ CON
 DAT
   org 0
   asmclk
-  
+
   wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
   wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
   wypin   #1, #TRANSMISSION_PIN
   dirh    #TRANSMISSION_PIN
-        
+
+  mov isGreaterOrEqual, #0
   mov     number1, #6
   mov     number2, #2
-  
+
   cmp     number1, number2 wc
   if_nc   mov     isGreaterOrEqual, #"1"
 
   wypin   isGreaterOrEqual, #TRANSMISSION_PIN
+
+  endprog
+    jmp  #$
 
   number1            res 1
   number2            res 1

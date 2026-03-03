@@ -1,0 +1,38 @@
+00000                 | 
+00000                 | #line 1 "/Users/kennethwanamaker/Downloads/flexprop/_pasm2/tutorial_final/0006_and.spin2"
+00000                 | 'and.spin2
+00000                 | CON
+00000                 |   _CLKFREQ          = 180_000_000
+00000                 |   BAUD_RATE         = 2_000_000
+00000                 |   TRANSMISSION_PIN  = 62
+00000                 |   BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+00000                 |   BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+00000                 | 
+00000                 | DAT
+00000 000             |   org 0
+00000 000 04 80 80 FF 
+00004 001 00 F0 65 FD |   hubset	##clkmode_ & !%11
+00008 002 86 01 80 FF 
+0000c 003 1F 80 66 FD | 	waitx	##20_000_000/100
+00010 004 04 80 80 FF 
+00014 005 00 F6 65 FD | 	hubset	##clkmode_
+00018 006             | 
+00018 006 00 00 80 FF 
+0001c 007 3E F8 0C FC |   wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+00020 008 00 2D 80 FF 
+00024 009 3E 0E 1C FC |   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+00028 00a 3E 02 2C FC |   wypin  #1, #TRANSMISSION_PIN
+0002c 00b 41 7C 64 FD |   dirh   #TRANSMISSION_PIN
+00030 00c             |   
+00030 00c 0D 22 04 F6 |   mov number1, #13
+00034 00d 05 22 04 F5 |   and number1, #5
+00038 00e             | 
+00038 00e 30 22 04 F1 |   add number1, #"0"
+0003c 00f 3E 22 24 FC |   wypin number1, #TRANSMISSION_PIN
+00040 010             | 
+00040 010             |   endprog
+00040 010 FC FF 9F FD |     jmp  #$
+00044 011             | 
+00044 011             |   number1 res 1
+00044 011 
+00044 012             | 

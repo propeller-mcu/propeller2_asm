@@ -105,7 +105,8 @@ DAT
       if_c  jmp #.txwait
     ret
     
-    endprog
+  endprog
+    jmp  #$
 
   spi_command        res 1
   flash_address      res 1

@@ -29,5 +29,6 @@ DAT
     ret
 
   endprog
+    jmp  #$
 
   number1 res 1

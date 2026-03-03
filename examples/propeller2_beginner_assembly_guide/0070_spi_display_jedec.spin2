@@ -126,6 +126,7 @@ DAT
     ret
 
   endprog
+    jmp  #$
 
   spi_command         res 1
   spi_reception       res 1

@@ -61,6 +61,7 @@ DAT
     ret
 
   endprog
+    jmp  #$
 
   testString byte "451", 0
 
