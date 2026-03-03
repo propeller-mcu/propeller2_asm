@@ -42,3 +42,13 @@ References to the obsolete simclk variable have been removed from all examples. 
 #### WAITX / NOP Instruction Timing Correction
 
 In the “WAITX vs NOP” topic, the previous statement that instructions execute in one clock cycle has been corrected. On final Propeller 2 hardware, all base instructions take two clock cycles. This affects timing calculations for spin-wait loops, SmartPin delays, and bit-banging routines.
+
+### 2026-03-03
+
+### General updates
+
+- Fixed all code so res variables for RAM storage are now consistently placed below byte/word/long declarations.
+- Tested all programs with FlexProp and the Spin IDE to ensure full compatibility.
+- Updated the comparison / if_* Instructions chapter to include the new if_a instruction.
+- Added explanation of the wcz flags in the comparison section for clarity.
+Revised the Decimal to String section to revisit the routine and include a detailed explanation of the ptra register and its role in memory operations
