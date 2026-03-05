@@ -1,0 +1,70 @@
+'cog_lock.spin2
+CON
+  _CLKFREQ          = 180_000_000
+  BAUD_RATE         = 2_000_000
+  TRANSMISSION_PIN  = 62
+  BIT_PERIOD        = (_CLKFREQ / BAUD_RATE)
+  BAUD_MODE         = (BIT_PERIOD << 16) | (8 - 1)
+
+DAT
+  org 0
+  asmclk
+
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+
+  mov     working_value, #0
+  wrword   working_value, ##@shared_calculation
+
+  mov     working_value, #0
+  wrbyte   working_value, ##@shared_done_counter
+
+  locknew working_value
+  wrbyte working_value, ##@shared_lock
+
+start
+  coginit #1, ##@addition
+  coginit #2, ##@addition
+
+  wait_for_cogs
+    rdbyte working_value, ##@shared_done_counter
+    cmp working_value, #2 wz
+    if_nz jmp #wait_for_cogs
+
+  rdword working_value, ##@shared_calculation
+  add working_value, #"0"
+  wypin working_value, #TRANSMISSION_PIN
+
+  jmp #endprog
+
+addition
+  .try_lock
+    rdbyte working_value, ##@shared_lock
+    locktry working_value wc
+    if_nc jmp #.try_lock
+
+  rdword working_value, ##@shared_calculation
+  add working_value, #2
+  add working_value, #2
+  wrword working_value, ##@shared_calculation
+
+  rdbyte working_value, ##@shared_done_counter
+  add working_value, #1
+  wrbyte working_value, ##@shared_done_counter
+
+  rdbyte working_value, ##@shared_lock
+  lockrel working_value
+
+  cogid working_value
+  cogstop working_value
+  ret
+
+endprog
+  jmp #$
+
+shared_calculation   word 0, 0
+shared_done_counter  byte 0
+shared_lock          res 1
+working_value        res 1
