@@ -15,8 +15,9 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 ## Helpful Resources
 
 - [Parallax Website](https://www.parallax.com/) – Official Propeller 2 info and documentation  
-- [Parallax Forums](https://forums.parallax.com/) – Community discussion and support  
-- [FlexProp](https://github.com/totalspectrum/flexprop/) – Software used for Propeller development
+- [Parallax Forums](https://forums.parallax.com/) – Community discussion and support
+- [Spin Tools IDE](https://www.maccasoft.com/en/spin-tools-ide/) – a development environment for the Parallax Propeller 1 and 2.
+- [FlexProp](https://github.com/totalspectrum/flexprop/) – a simple GUI for creating applications for the Parallax Propeller 1 and 2.
 
 ## Updates
 
