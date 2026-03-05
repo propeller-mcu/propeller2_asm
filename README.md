@@ -53,3 +53,14 @@ In the “WAITX vs NOP” topic, the previous statement that instructions execut
 - Updated the comparison / if_* Instructions chapter to include the new if_a instruction.
 - Added explanation of the wcz flags in the comparison section for clarity.
 - Revised the Decimal to String section to include an explanation of the ptra register and its role in memory operations
+
+### 2026-03-05
+
+### Cog Control → Hub & Process Control Updates
+
+- Split the original “Cog Control” chapter into two focused sections: Cog Control and Process Control.
+- Cog Control now emphasizes starting, stopping, and managing individual cogs.
+- Process Control introduces safe multi-cog coordination using hub memory locks.
+- Added example program to demonstrate proper lock acquisition and release, done counters, and independent cog termination.
+- Clarified the role of hub memory as the central communication medium between cogs and the main program.
+
