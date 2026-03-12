@@ -34,7 +34,7 @@ dat
       call    #.flush_transmission
       cmp     input_character, #"0" wc
       if_c   jmp     #.not_number
-      cmp     input_character, #"9" wz,wc
+      cmp     input_character, #"9" wcz
       if_a   jmp     #.not_number
 
       mov     string_pointer, ##@msg_number
