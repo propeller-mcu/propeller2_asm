@@ -64,3 +64,12 @@ In the “WAITX vs NOP” topic, the previous statement that instructions execut
 - Added example program to demonstrate proper lock acquisition and release, done counters, and independent cog termination.
 - Clarified the role of hub memory as the central communication medium between cogs and the main program.
 
+### 2026-03-12
+
+### Compiler testing
+
+Verified the examples work with the following:
+- FlexProp
+- PNut
+- Spin Tools IDE
+- Propeller Tool IDE
