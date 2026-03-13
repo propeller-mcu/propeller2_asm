@@ -21,6 +21,46 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+### 2026-03-12
+
+### Compiler testing
+
+Verified the examples work with the following:
+- FlexProp
+- PNut
+- Spin Tools IDE
+- Propeller Tool IDE
+
+### 2026-03-05
+
+### Cog Control → Hub & Process Control Updates
+
+- Split the original “Cog Control” chapter into two focused sections: Cog Control and Process Control.
+- Cog Control now emphasizes starting, stopping, and managing individual cogs.
+- Process Control introduces safe multi-cog coordination using hub memory locks.
+- Added example program to demonstrate proper lock acquisition and release, done counters, and independent cog termination.
+- Clarified the role of hub memory as the central communication medium between cogs and the main program.
+
+### 2026-03-03
+
+### General updates
+
+- Fixed all code so res variables for RAM storage are now consistently placed below byte/word/long declarations.
+- Tested all programs with FlexProp and the Spin IDE to ensure full compatibility.
+- Updated the comparison / if_* Instructions chapter to include the new if_a instruction.
+- Added explanation of the wcz flags in the comparison section for clarity.
+- Revised the Decimal to String section to include an explanation of the ptra register and its role in memory operations
+
+### 2026-02-25
+
+#### Simclk Removal Update
+
+References to the obsolete simclk variable have been removed from all examples. Timing in spin-wait loops and SmartPin routines now relies entirely on real instruction cycles and the system clock (_CLKFREQ), as handled automatically by the compiler or, optionally, asmclk.
+
+#### WAITX / NOP Instruction Timing Correction
+
+In the “WAITX vs NOP” topic, the previous statement that instructions execute in one clock cycle has been corrected. On final Propeller 2 hardware, all base instructions take two clock cycles. This affects timing calculations for spin-wait loops, SmartPin delays, and bit-banging routines.
+
 ### 2026-02-24
 
 #### Safe Program Termination Update
@@ -33,43 +73,3 @@ endprog
 ```
 
 This prevents execution into variable (`res`) memory and ensures stable PST behavior.
-
-### 2026-02-25
-
-#### Simclk Removal Update
-
-References to the obsolete simclk variable have been removed from all examples. Timing in spin-wait loops and SmartPin routines now relies entirely on real instruction cycles and the system clock (_CLKFREQ), as handled automatically by the compiler or, optionally, asmclk.
-
-#### WAITX / NOP Instruction Timing Correction
-
-In the “WAITX vs NOP” topic, the previous statement that instructions execute in one clock cycle has been corrected. On final Propeller 2 hardware, all base instructions take two clock cycles. This affects timing calculations for spin-wait loops, SmartPin delays, and bit-banging routines.
-
-### 2026-03-03
-
-### General updates
-
-- Fixed all code so res variables for RAM storage are now consistently placed below byte/word/long declarations.
-- Tested all programs with FlexProp and the Spin IDE to ensure full compatibility.
-- Updated the comparison / if_* Instructions chapter to include the new if_a instruction.
-- Added explanation of the wcz flags in the comparison section for clarity.
-- Revised the Decimal to String section to include an explanation of the ptra register and its role in memory operations
-
-### 2026-03-05
-
-### Cog Control → Hub & Process Control Updates
-
-- Split the original “Cog Control” chapter into two focused sections: Cog Control and Process Control.
-- Cog Control now emphasizes starting, stopping, and managing individual cogs.
-- Process Control introduces safe multi-cog coordination using hub memory locks.
-- Added example program to demonstrate proper lock acquisition and release, done counters, and independent cog termination.
-- Clarified the role of hub memory as the central communication medium between cogs and the main program.
-
-### 2026-03-12
-
-### Compiler testing
-
-Verified the examples work with the following:
-- FlexProp
-- PNut
-- Spin Tools IDE
-- Propeller Tool IDE
