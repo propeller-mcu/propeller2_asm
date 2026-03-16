@@ -21,6 +21,15 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+### 2026-03-16
+
+### General updates
+- Appendix A: DEBUG commands that work universally across compilers
+- Appendix B: Index of all instructions used in the manual
+- Added RQPIN as an alternative to RDPIN
+- Added exercises for each chapter
+
+
 ### 2026-03-12
 
 ### Compiler testing
