@@ -112,7 +112,7 @@ DAT
 
   print_nibble
     cmp pr0, #10 wc
-    if_b add pr0, #"0"
+    if_c add pr0, #"0"
     if_nc add pr0, #"A"-10
     mov uart_transmission, pr0
     call #uart_transmit_char
