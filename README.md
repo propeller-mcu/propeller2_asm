@@ -21,6 +21,13 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+
+### 2026-04-02
+
+### General updates
+- Appendix B changed to Propeller 2 Assembly Reference. This appendix provides a categorized reference of Propeller 2 assembly instructions and directives included in this manual, each with a brief description. It is not a complete listing of all instructions, directives, or features supported by the Propeller 2 architecture. 
+
+
 ### 2026-03-16
 
 ### General updates
