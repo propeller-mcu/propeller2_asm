@@ -24,7 +24,7 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 ### 2026-04-06
 
 ### General updates
--Fixed the initialization sequence for both transmission (TX) and reception (RX) pins when configuring SmartPins. Each pin is now placed into a safe inactive state using DIRL before applying WRPIN and WXPIN settings, then re-enabled with DIRH.
+- Fixed the initialization sequence for both transmission (TX) and reception (RX) pins when configuring SmartPins. Each pin is now placed into a safe inactive state using DIRL before applying WRPIN and WXPIN settings, then re-enabled with DIRH.
 
 This prevents unintended or partial signals during setup and ensures more reliable serial communication.
 
