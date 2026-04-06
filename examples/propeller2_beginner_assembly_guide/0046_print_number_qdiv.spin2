@@ -10,11 +10,12 @@ DAT
   org 0
   asmclk
 
+  dirl   #TRANSMISSION_PIN
   wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
-  wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+  wypin  #1, #TRANSMISSION_PIN
+
   mov number_store, #245
   wrlong  number_store, ##@number1
   rdlong  number_store, ##@number1
@@ -39,7 +40,7 @@ DAT
   mov     digit, value
   add     digit, #"0"
   wypin   digit, #TRANSMISSION_PIN
-  
+
   endprog
     jmp  #$
 

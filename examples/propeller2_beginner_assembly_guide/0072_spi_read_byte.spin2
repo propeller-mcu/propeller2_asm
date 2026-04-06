@@ -21,24 +21,25 @@ CON
 DAT
   org 0
   asmclk
-  
-  wrpin   ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
-  wxpin   ##BAUD_MODE, #TRANSMISSION_PIN
-  wypin   #1, #TRANSMISSION_PIN
-  dirh    #TRANSMISSION_PIN
-  
+
+  dirl   #TRANSMISSION_PIN
+  wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
+  wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
+  dirh   #TRANSMISSION_PIN
+  wypin  #1, #TRANSMISSION_PIN
+
   wrpin   ##SPI_CLK_MODE, #SPI_CLK
   wrpin   ##SPI_MOSI_MODE, #SPI_MOSI
   wrpin   ##SPI_MISO_MODE, #SPI_MISO
   wxpin   ##SPI_CLK_DIV, #SPI_CLK
   drvl    #SPI_CLK
-  
+
   wxpin   ##SPI_8BIT_CONTROL, #SPI_MOSI
   wxpin   ##SPI_8BIT_CONTROL, #SPI_MISO
-  
+
   mov flash_address, ##0
   mov page_size, ##255
-  
+
   call #read_flash_256
   jmp  #endprog
 
@@ -46,21 +47,21 @@ DAT
     drvl #SPI_CS
     mov spi_command, #$03
     call #spi_transmit
-    
+
     mov spi_command, flash_address
     shr spi_command, #16
     and spi_command, #$FF
     call #spi_transmit
-    
+
     mov spi_command, flash_address
     shr spi_command, #8
     and spi_command, #$FF
     call #spi_transmit
-    
+
     mov spi_command, flash_address
     and spi_command, #$FF
     call #spi_transmit
-    
+
     mov byte_count, ##512
 
 
@@ -69,7 +70,7 @@ DAT
     mov uart_transmission, spi_reception
     call #uart_transmit_char
     djnz byte_count, #.read_loop
-    
+
     drvh #SPI_CS
     ret
 
@@ -104,7 +105,7 @@ DAT
       rdpin pr2, #TRANSMISSION_PIN wc
       if_c  jmp #.txwait
     ret
-    
+
   endprog
     jmp  #$
 

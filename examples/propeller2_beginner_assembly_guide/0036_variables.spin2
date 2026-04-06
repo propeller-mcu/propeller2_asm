@@ -10,11 +10,12 @@ DAT
   org 0
   asmclk
 
+  dirl   #TRANSMISSION_PIN
   wrpin  ##(P_ASYNC_TX | P_OE), #TRANSMISSION_PIN
   wxpin  ##BAUD_MODE, #TRANSMISSION_PIN
-  wypin  #1, #TRANSMISSION_PIN
   dirh   #TRANSMISSION_PIN
-  
+  wypin  #1, #TRANSMISSION_PIN
+
   wypin character, #TRANSMISSION_PIN
   waitx #511
 
@@ -26,7 +27,7 @@ DAT
   mov number2, #2
   add number2, #"0"
   wypin number2, #TRANSMISSION_PIN
-  
+
   endprog
     jmp  #$
 
