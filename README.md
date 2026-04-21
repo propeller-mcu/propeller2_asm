@@ -21,6 +21,14 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+### 2026-04-21
+
+### Beginner guide updates
+- Corrected and standardized the IF_A conditional execution section
+- Removed outdated reference to the QFRAC command
+- Fixed inaccuracies related to DIV instruction behavior
+- Improved overall document structure for consistency and readability
+
 ### 2026-04-06
 
 ### General updates
