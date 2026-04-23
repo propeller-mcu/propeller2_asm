@@ -21,6 +21,11 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+### 2026-04-23
+
+### Beginner guide updates
+- Improved overall document structure for consistency and readability
+
 ### 2026-04-21
 
 ### Beginner guide updates
