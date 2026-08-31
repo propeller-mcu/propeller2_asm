@@ -1,0 +1,33 @@
+CON
+    _clkfreq = 180_000_000
+
+    LED_PIN = 56
+
+PUB main() | answer, cog
+
+    answer := add_two(5)
+    DEBUG(UDEC(answer))          ' Inline P2ASM runs here; expected: 7
+
+    cog := COGINIT(COGEXEC_NEW, @blink_cog, 0)
+    DEBUG(SDEC(cog))             ' New cog ID; -1 means no cog was available
+
+    REPEAT
+        WAITMS(1000)             ' Main Spin2 cog remains alive independently
+
+PUB add_two(value) : result
+
+    result := value
+
+    ORG
+        add     result, #2
+    END
+
+DAT
+        ORG
+
+blink_cog
+        drvh    #LED_PIN
+.loop
+        waitx   ##100_000_000    ' About 0.5 second at 200 MHz
+        drvnot  #LED_PIN
+        jmp     #.loop

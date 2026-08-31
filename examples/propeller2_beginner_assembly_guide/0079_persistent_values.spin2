@@ -1,0 +1,30 @@
+CON
+    _clkfreq = 180_000_000
+
+VAR
+    long counter
+
+PUB main() | answer
+
+    counter := 10
+
+    answer := increment_counter()
+    DEBUG(UDEC(answer))          ' Expected: 11
+
+    answer := increment_counter()
+    DEBUG(UDEC(answer))          ' Expected: 12
+
+    answer := increment_counter()
+    DEBUG(UDEC(answer))          ' Expected: 13
+
+    REPEAT
+
+PUB increment_counter() : result
+
+    result := counter
+
+    ORG
+        add     result, #1
+    END
+
+    counter := result

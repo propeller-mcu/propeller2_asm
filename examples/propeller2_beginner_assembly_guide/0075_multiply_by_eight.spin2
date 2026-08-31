@@ -1,0 +1,17 @@
+CON
+    _clkfreq = 180_000_000
+
+PUB main() | answer
+
+    answer := multiply_by_eight(4)
+    DEBUG(UDEC(answer))          ' Expected: 32
+
+    REPEAT
+
+PUB multiply_by_eight(value) : result
+
+    result := value
+
+    ORG
+        shl     result, #3
+    END

@@ -1,0 +1,27 @@
+CON
+    _clkfreq = 180_000_000
+
+PUB main() | value
+
+    value := get_value()
+    value := fast_process(value)
+    display_value(value)
+
+    REPEAT
+
+PUB get_value() : value
+
+    value := 10
+
+PUB fast_process(value) : result
+
+    result := value
+
+    ORG
+        shl     result, #2
+        add     result, #1
+    END
+
+PUB display_value(value)
+
+    DEBUG(UDEC(value))           ' Expected: 41

@@ -1,0 +1,20 @@
+CON
+    _clkfreq = 180_000_000
+
+    TEST_PIN = 0
+
+PUB main()
+
+    DEBUG(UDEC(TEST_PIN))        ' Probe this pin with a scope/logic analyzer
+
+    REPEAT
+        pulse(TEST_PIN)
+        WAITMS(1)
+
+PUB pulse(pin)
+
+    ORG
+        drvh    pin
+        nop
+        drvl    pin
+    END

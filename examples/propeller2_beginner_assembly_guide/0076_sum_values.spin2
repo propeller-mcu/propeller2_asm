@@ -1,0 +1,28 @@
+CON
+    _clkfreq = 180_000_000
+
+VAR
+    long values[3]
+
+PUB main() | total
+
+    values[0] := 10
+    values[1] := 20
+    values[2] := 30
+
+    total := sum_values(@values, 3)
+    DEBUG(UDEC(total))           ' Expected: 60
+
+    REPEAT
+
+PUB sum_values(address, count) : total | value
+
+    total := 0
+
+    ORG
+.loop
+        rdlong  value, address
+        add     address, #4
+        add     total, value
+        djnz    count, #.loop
+    END

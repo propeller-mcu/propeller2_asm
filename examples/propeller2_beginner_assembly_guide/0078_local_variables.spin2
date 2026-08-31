@@ -1,0 +1,19 @@
+CON
+    _clkfreq = 180_000_000
+
+PUB main() | answer
+
+    answer := calculate(10)
+    DEBUG(UDEC(answer))          ' Expected: 25
+
+    REPEAT
+
+PUB calculate(value) : result | temp
+
+    temp := value
+
+    ORG
+        shl     temp, #1
+        add     temp, #5
+        mov     result, temp
+    END

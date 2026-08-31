@@ -1,0 +1,17 @@
+CON
+    _clkfreq = 180_000_000
+
+PUB main() | answer
+
+    answer := add_two(5)
+    DEBUG(UDEC(answer))          ' Expected: 7
+
+    REPEAT
+
+PUB add_two(value) : result
+
+    result := value
+
+    ORG
+        add     result, #2
+    END
