@@ -24,8 +24,8 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 ### 2026-08-31
 
 ### Beginner guide updates
-- Added appendix for "Intergrating P2ASM with high-level programs"
-- Added supplemental example appendix programs for "Intergrating P2ASM with high-level programs"
+- Added appendix: “Integrating P2ASM with High-Level Programs”
+- Added supplemental example programs for “Integrating P2ASM with High-Level Programs”
 
 
 ### 2026-04-23
