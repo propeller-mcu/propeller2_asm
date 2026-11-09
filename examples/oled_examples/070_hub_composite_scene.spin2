@@ -1,0 +1,683 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 070 / 119
+'
+' HUB Composite Scene
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    call    #clear_buffer
+
+    ' Build several different
+    ' graphic elements together
+    ' inside HUB RAM.
+
+    call    #draw_composite_scene
+
+    ' Transfer the completed scene
+    ' to the OLED in one push.
+
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes.
+'
+' The OLED itself is not
+' changed until push_buffer.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+'
+' The buffer is read backward
+' and each byte is bit reversed
+' to provide a software
+' 180-degree rotation.
+' =========================
+
+push_buffer
+
+    mov     ptr, ##frame_buffer
+
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE
+' FOR DISPLAY
+'
+' $A0 / $C0 remain configured
+' as the controller's normal
+' orientation.
+'
+' Byte order and bit order are
+' reversed in software instead.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' Framebuffer address:
+'
+' (ypos / 8) * 128 + xpos
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+
+    ' page = ypos / 8
+
+    shr     offset, #3
+
+    ' page * 128
+
+    shl     offset, #7
+
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    ' Build the bit mask
+    ' for Y inside the page.
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+
+    shl     mask, temp
+
+    ' Preserve previous pixels.
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' DRAW POINT LIST
+'
+' Each HUB data entry contains:
+'
+' X byte
+' Y byte
+'
+' point_ptr is separate from ptr
+' because set_pixel uses ptr for
+' framebuffer addressing.
+' =========================
+
+draw_point_list
+
+point_list_loop
+
+    rdbyte  xpos, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  ypos, point_ptr
+    add     point_ptr, #1
+
+    call    #set_pixel
+
+    djnz    point_count, #point_list_loop
+
+    ret
+
+' =========================
+' HUB COMPOSITE SCENE
+'
+' Combines several independent
+' drawing techniques:
+'
+' - horizon
+'
+' - sun
+'
+' - house
+'
+' - roof
+'
+' - ground texture
+'
+' Everything is assembled in
+' HUB RAM before one OLED push.
+' =========================
+
+draw_composite_scene
+
+' -------------------------
+' HORIZON
+'
+' Draw a horizontal line
+' across the entire display
+' at Y = 42.
+' -------------------------
+
+    mov     xpos, #0
+    mov     ypos, #42
+
+    mov     line_count, #128
+
+scene_horizon_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    line_count, #scene_horizon_loop
+
+' -------------------------
+' SUN
+'
+' The circular sun is stored
+' as a list of X/Y points.
+' -------------------------
+
+    mov     point_ptr, ##scene_sun_points
+
+    mov     point_count, #56
+
+    call    #draw_point_list
+
+' -------------------------
+' HOUSE BODY
+'
+' X = 30 through 53
+'
+' Y = 30 through 42
+'
+' Width  = 24 pixels
+' Height = 13 pixels
+' -------------------------
+
+    mov     ypos, #30
+
+    mov     row_count, #13
+
+scene_house_row
+
+    mov     xpos, #30
+
+    mov     column_count, #24
+
+scene_house_pixel
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    column_count, #scene_house_pixel
+
+    add     ypos, #1
+
+    djnz    row_count, #scene_house_row
+
+' -------------------------
+' LEFT ROOF
+'
+' Diagonal:
+'
+' 28,30 -> 42,16
+' -------------------------
+
+    mov     xpos, #28
+    mov     ypos, #30
+
+    mov     step_count, #15
+
+scene_roof_left
+
+    call    #set_pixel
+
+    add     xpos, #1
+    sub     ypos, #1
+
+    djnz    step_count, #scene_roof_left
+
+' -------------------------
+' RIGHT ROOF
+'
+' Diagonal:
+'
+' 42,16 -> 56,30
+' -------------------------
+
+    mov     xpos, #42
+    mov     ypos, #16
+
+    mov     step_count, #15
+
+scene_roof_right
+
+    call    #set_pixel
+
+    add     xpos, #1
+    add     ypos, #1
+
+    djnz    step_count, #scene_roof_right
+
+' -------------------------
+' GROUND TEXTURE
+'
+' Draw 20 individual pixels.
+'
+' X advances six pixels after
+' every point.
+'
+' Y alternates between
+' 50 and 55.
+' -------------------------
+
+    mov     xpos, #4
+    mov     ypos, #50
+
+    mov     point_count, #20
+
+scene_ground_loop
+
+    call    #set_pixel
+
+    add     xpos, #6
+
+    testb   xpos, #2 wc
+
+if_c mov    ypos, #55
+if_nc mov   ypos, #50
+
+    djnz    point_count, #scene_ground_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI.
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+point_ptr       res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+line_count      res 1
+point_count     res 1
+
+row_count       res 1
+column_count    res 1
+
+step_count      res 1
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' =
+'
+' 1024 HUB bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' SUN POINT DATA
+'
+' 56 X/Y points
+'
+' Each pair contains:
+'
+' X, Y
+' =========================
+
+scene_sun_points
+
+    byte    84,13,84,14,84,15,84,16
+    byte    84,17,84,18,84,19
+
+    byte    85,11,85,12
+    byte    85,20,85,21
+
+    byte    86,10,86,22
+    byte    87,9,87,23
+    byte    88,8,88,24
+
+    byte    89,7,89,25
+    byte    90,7,90,25
+
+    byte    91,6,91,26
+    byte    92,6,92,26
+    byte    93,6,93,26
+    byte    94,6,94,26
+    byte    95,6,95,26
+    byte    96,6,96,26
+    byte    97,6,97,26
+
+    byte    98,7,98,25
+    byte    99,7,99,25
+
+    byte    100,8,100,24
+    byte    101,9,101,23
+    byte    102,10,102,22
+
+    byte    103,11,103,12
+    byte    103,20,103,21
+
+    byte    104,13,104,14,104,15,104,16
+    byte    104,17,104,18,104,19

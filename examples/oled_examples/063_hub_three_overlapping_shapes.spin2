@@ -1,0 +1,773 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 063 / 119
+'
+' HUB Three Overlapping Shapes
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_buffer
+
+    call    #draw_hub_rectangle_outline
+    call    #draw_hub_diamond_outline
+
+    mov     point_ptr, ##three_shape_circle_points
+    mov     point_count, #92
+
+    call    #draw_point_list
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    ' -------------------------
+    ' NORMAL VERTICAL ORIENTATION
+    '
+    ' X = 0   left
+    ' X = 127 right
+    '
+    ' Y = 0   top
+    ' Y = 63  bottom
+    ' -------------------------
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes.
+'
+' This modifies HUB RAM only.
+' Nothing is sent to the OLED yet.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' OFFSET:
+'
+' page = ypos / 8
+'
+' offset =
+'     page * 128 + xpos
+'
+' Then we OR the appropriate
+' vertical pixel bit into the byte.
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' HUB RECTANGLE OUTLINE
+'
+' Rectangle:
+'
+' Left   = 28
+' Right  = 99
+' Top    = 16
+' Bottom = 47
+'
+' Width  = 72 pixels
+' Height = 32 pixels
+'
+' The rectangle is drawn directly
+' into the HUB framebuffer.
+' =========================
+
+draw_hub_rectangle_outline
+
+' -------------------------
+' TOP EDGE
+' -------------------------
+
+    mov     xpos, #28
+    mov     ypos, #16
+    mov     line_count, #72
+
+rect_top_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    line_count, #rect_top_loop
+
+' -------------------------
+' BOTTOM EDGE
+' -------------------------
+
+    mov     xpos, #28
+    mov     ypos, #47
+    mov     line_count, #72
+
+rect_bottom_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    line_count, #rect_bottom_loop
+
+' -------------------------
+' LEFT EDGE
+' -------------------------
+
+    mov     xpos, #28
+    mov     ypos, #16
+    mov     line_count, #32
+
+rect_left_loop
+
+    call    #set_pixel
+
+    add     ypos, #1
+
+    djnz    line_count, #rect_left_loop
+
+' -------------------------
+' RIGHT EDGE
+' -------------------------
+
+    mov     xpos, #99
+    mov     ypos, #16
+    mov     line_count, #32
+
+rect_right_loop
+
+    call    #set_pixel
+
+    add     ypos, #1
+
+    djnz    line_count, #rect_right_loop
+
+    ret
+
+' =========================
+' HUB DIAMOND OUTLINE
+'
+' Diamond points:
+'
+' Top    = 64,10
+' Right  = 86,32
+' Bottom = 64,54
+' Left   = 42,32
+'
+' Four diagonal edges are drawn
+' into the same HUB framebuffer.
+' =========================
+
+draw_hub_diamond_outline
+
+' -------------------------
+' TOP -> RIGHT
+' -------------------------
+
+    mov     xpos, #64
+    mov     ypos, #10
+    mov     step_count, #23
+
+diamond_edge_1
+
+    call    #set_pixel
+
+    add     xpos, #1
+    add     ypos, #1
+
+    djnz    step_count, #diamond_edge_1
+
+' -------------------------
+' RIGHT -> BOTTOM
+' -------------------------
+
+    mov     xpos, #86
+    mov     ypos, #32
+    mov     step_count, #23
+
+diamond_edge_2
+
+    call    #set_pixel
+
+    sub     xpos, #1
+    add     ypos, #1
+
+    djnz    step_count, #diamond_edge_2
+
+' -------------------------
+' BOTTOM -> LEFT
+' -------------------------
+
+    mov     xpos, #64
+    mov     ypos, #54
+    mov     step_count, #23
+
+diamond_edge_3
+
+    call    #set_pixel
+
+    sub     xpos, #1
+    sub     ypos, #1
+
+    djnz    step_count, #diamond_edge_3
+
+' -------------------------
+' LEFT -> TOP
+' -------------------------
+
+    mov     xpos, #42
+    mov     ypos, #32
+    mov     step_count, #23
+
+diamond_edge_4
+
+    call    #set_pixel
+
+    add     xpos, #1
+    sub     ypos, #1
+
+    djnz    step_count, #diamond_edge_4
+
+    ret
+
+' =========================
+' DRAW POINT LIST
+'
+' Each circle point is stored
+' in HUB RAM as:
+'
+' byte X
+' byte Y
+'
+' point_ptr walks through the
+' circle data.
+'
+' IMPORTANT:
+'
+' point_ptr is NOT ptr.
+'
+' ptr is used by set_pixel to
+' access the framebuffer.
+'
+' Keeping the two pointers
+' separate prevents set_pixel
+' from destroying our position
+' in the circle data.
+' =========================
+
+draw_point_list
+
+point_list_loop
+
+    rdbyte  xpos, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  ypos, point_ptr
+    add     point_ptr, #1
+
+    call    #set_pixel
+
+    djnz    point_count, #point_list_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+point_ptr       res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+line_count      res 1
+step_count      res 1
+point_count     res 1
+
+' =========================
+' HUB RAM
+' =========================
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages
+' 128 bytes per page
+'
+' Total = 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' THIRD SHAPE
+'
+' CONNECTED CIRCLE OUTLINE
+'
+' Center:
+'
+' X = 64
+' Y = 30
+'
+' Radius:
+'
+' 16 pixels
+'
+' 92 points total.
+'
+' These pixels form one
+' 8-connected circular outline.
+'
+' The circle overlaps both the
+' rectangle and the diamond.
+'
+' All three shapes coexist in
+' the same HUB framebuffer before
+' the final OLED transfer.
+' =========================
+
+three_shape_circle_points
+
+    byte    48,27,48,28,48,29,48,30
+    byte    48,31,48,32,48,33
+
+    byte    49,24,49,25,49,26
+    byte    49,34,49,35,49,36
+
+    byte    50,22,50,23
+    byte    50,37,50,38
+
+    byte    51,21,51,39
+
+    byte    52,19,52,20
+    byte    52,40,52,41
+
+    byte    53,18,53,42
+
+    byte    54,18,54,42
+
+    byte    55,17,55,43
+
+    byte    56,16,56,44
+
+    byte    57,16,57,44
+
+    byte    58,15,58,45
+
+    byte    59,15,59,45
+
+    byte    60,15,60,45
+
+    byte    61,14,61,46
+
+    byte    62,14,62,46
+
+    byte    63,14,63,46
+
+    byte    64,14,64,46
+
+    byte    65,14,65,46
+
+    byte    66,14,66,46
+
+    byte    67,14,67,46
+
+    byte    68,15,68,45
+
+    byte    69,15,69,45
+
+    byte    70,15,70,45
+
+    byte    71,16,71,44
+
+    byte    72,16,72,44
+
+    byte    73,17,73,43
+
+    byte    74,18,74,42
+
+    byte    75,18,75,42
+
+    byte    76,19,76,20
+    byte    76,40,76,41
+
+    byte    77,21,77,39
+
+    byte    78,22,78,23
+    byte    78,37,78,38
+
+    byte    79,24,79,25,79,26
+    byte    79,34,79,35,79,36
+
+    byte    80,27,80,28,80,29,80,30
+    byte    80,31,80,32,80,33

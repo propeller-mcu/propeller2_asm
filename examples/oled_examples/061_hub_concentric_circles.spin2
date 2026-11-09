@@ -1,0 +1,561 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 061 / 119
+'
+' HUB Concentric Circles
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_buffer
+    call    #draw_hub_concentric_circles
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' DRAW HUB CONCENTRIC CIRCLES
+'
+' Center:
+'
+' X = 64
+' Y = 32
+'
+' Four connected circle outlines
+' are stored in HUB RAM.
+'
+' Every point is adjacent to the
+' previous point, so the outlines
+' remain visually connected.
+' =========================
+
+draw_hub_concentric_circles
+
+' -------------------------
+' INNER CIRCLE
+' Radius = 5
+' -------------------------
+
+    mov     point_ptr, ##circle_5_points
+    mov     point_count, #40
+    call    #draw_point_list
+
+' -------------------------
+' SECOND CIRCLE
+' Radius = 10
+' -------------------------
+
+    mov     point_ptr, ##circle_10_points
+    mov     point_count, #80
+    call    #draw_point_list
+
+' -------------------------
+' THIRD CIRCLE
+' Radius = 15
+' -------------------------
+
+    mov     point_ptr, ##circle_15_points
+    mov     point_count, #112
+    call    #draw_point_list
+
+' -------------------------
+' OUTER CIRCLE
+' Radius = 25
+' -------------------------
+
+    mov     point_ptr, ##circle_25_points
+    mov     point_count, ##176
+    call    #draw_point_list
+
+    ret
+
+' =========================
+' DRAW POINT LIST
+'
+' Each point consists of:
+'
+' byte X
+' byte Y
+'
+' point_ptr reads the graphics
+' data from HUB RAM.
+'
+' ptr remains dedicated to
+' framebuffer access.
+' =========================
+
+draw_point_list
+
+point_list_loop
+
+    rdbyte  xpos, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  ypos, point_ptr
+    add     point_ptr, #1
+
+    call    #set_pixel
+
+    djnz    point_count, #point_list_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd          res 1
+count        res 1
+spi_count    res 1
+
+page         res 1
+page_count   res 1
+
+xpos         res 1
+ypos         res 1
+
+temp         res 1
+
+ptr          res 1
+point_ptr    res 1
+
+value        res 1
+offset       res 1
+mask         res 1
+
+point_count  res 1
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+' = 1024 bytes
+' =========================
+
+rot_src      res 1
+rot_dst      res 1
+rot_count    res 1
+
+    orgh
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' CIRCLE RADIUS 5
+'
+' 40 connected pixels
+' =========================
+
+circle_5_points
+
+    byte    69,32,69,33,69,34,68,34,68,35,68,36,67,36,66,36
+    byte    66,37,65,37,64,37,63,37,62,37,62,36,61,36,60,36
+    byte    60,35,60,34,59,34,59,33,59,32,59,31,59,30,60,30
+    byte    60,29,60,28,61,28,62,28,62,27,63,27,64,27,65,27
+    byte    66,27,66,28,67,28,68,28,68,29,68,30,69,30,69,31
+
+' =========================
+' CIRCLE RADIUS 10
+'
+' 80 connected pixels
+' =========================
+
+circle_10_points
+
+    byte    74,32,74,33,74,34,74,35,73,35,73,36,73,37,72,37
+    byte    72,38,72,39,71,39,71,40,70,40,69,40,69,41,68,41
+    byte    67,41,67,42,66,42,65,42,64,42,63,42,62,42,61,42
+    byte    61,41,60,41,59,41,59,40,58,40,57,40,57,39,56,39
+    byte    56,38,56,37,55,37,55,36,55,35,54,35,54,34,54,33
+    byte    54,32,54,31,54,30,54,29,55,29,55,28,55,27,56,27
+    byte    56,26,56,25,57,25,57,24,58,24,59,24,59,23,60,23
+    byte    61,23,61,22,62,22,63,22,64,22,65,22,66,22,67,22
+    byte    67,23,68,23,69,23,69,24,70,24,71,24,71,25,72,25
+    byte    72,26,72,27,73,27,73,28,73,29,74,29,74,30,74,31
+
+' =========================
+' CIRCLE RADIUS 15
+'
+' 112 connected pixels
+' =========================
+
+circle_15_points
+
+    byte    79,32,79,33,79,34,79,35,79,36,78,36,78,37,78,38
+    byte    77,39,77,40,76,40,76,41,76,42,75,42,75,43,74,43
+    byte    74,44,73,44,72,44,72,45,71,45,70,46,69,46,68,46
+    byte    68,47,67,47,66,47,65,47,64,47,63,47,62,47,61,47
+    byte    60,47,60,46,59,46,58,46,57,45,56,45,56,44,55,44
+    byte    54,44,54,43,53,43,53,42,52,42,52,41,52,40,51,40
+    byte    51,39,50,38,50,37,50,36,49,36,49,35,49,34,49,33
+    byte    49,32,49,31,49,30,49,29,49,28,50,28,50,27,50,26
+    byte    51,25,51,24,52,24,52,23,52,22,53,22,53,21,54,21
+    byte    54,20,55,20,56,20,56,19,57,19,58,18,59,18,60,18
+    byte    60,17,61,17,62,17,63,17,64,17,65,17,66,17,67,17
+    byte    68,17,68,18,69,18,70,18,71,19,72,19,72,20,73,20
+    byte    74,20,74,21,75,21,75,22,76,22,76,23,76,24,77,24
+    byte    77,25,78,26,78,27,78,28,79,28,79,29,79,30,79,31
+
+' =========================
+' CIRCLE RADIUS 25
+'
+' 176 connected pixels
+' =========================
+
+circle_25_points
+
+    byte    89,32,89,33,89,34,89,35,89,36,89,37,88,37,88,38
+    byte    88,39,88,40,87,41,87,42,87,43,86,43,86,44,85,45
+    byte    85,46,84,46,84,47,83,48,83,49,82,49,82,50,81,50
+    byte    81,51,80,51,79,52,78,52,78,53,77,53,76,54,75,54
+    byte    75,55,74,55,73,55,72,56,71,56,70,56,69,56,69,57
+    byte    68,57,67,57,66,57,65,57,64,57,63,57,62,57,61,57
+    byte    60,57,59,57,59,56,58,56,57,56,56,56,55,55,54,55
+    byte    53,55,53,54,52,54,51,53,50,53,50,52,49,52,48,51
+    byte    47,51,47,50,46,50,46,49,45,49,45,48,44,47,44,46
+    byte    43,46,43,45,42,44,42,43,41,43,41,42,41,41,40,40
+    byte    40,39,40,38,40,37,39,37,39,36,39,35,39,34,39,33
+    byte    39,32,39,31,39,30,39,29,39,28,39,27,40,27,40,26
+    byte    40,25,40,24,41,23,41,22,41,21,42,21,42,20,43,19
+    byte    43,18,44,18,44,17,45,16,45,15,46,15,46,14,47,14
+    byte    47,13,48,13,49,12,50,12,50,11,51,11,52,10,53,10
+    byte    53,9,54,9,55,9,56,8,57,8,58,8,59,8,59,7
+    byte    60,7,61,7,62,7,63,7,64,7,65,7,66,7,67,7
+    byte    68,7,69,7,69,8,70,8,71,8,72,8,73,9,74,9
+    byte    75,9,75,10,76,10,77,11,78,11,78,12,79,12,80,13
+    byte    81,13,81,14,82,14,82,15,83,15,83,16,84,17,84,18
+    byte    85,18,85,19,86,20,86,21,87,21,87,22,87,23,88,24
+    byte    88,25,88,26,88,27,89,27,89,28,89,29,89,30,89,31

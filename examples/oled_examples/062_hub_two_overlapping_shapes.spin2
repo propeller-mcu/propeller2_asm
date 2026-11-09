@@ -1,0 +1,574 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 062 / 119
+'
+' HUB Two Overlapping Shapes
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_buffer
+    call    #draw_hub_filled_rectangle
+
+    mov     point_ptr, ##overlap_circle_points
+    mov     point_count, #144
+    call    #draw_point_list
+
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    ' -------------------------
+    ' NORMAL VERTICAL ORIENTATION
+    '
+    ' X = 0   left
+    ' X = 127 right
+    '
+    ' Y = 0   top
+    ' Y = 63  bottom
+    ' -------------------------
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' 128 x 64 OLED
+'
+' 1024 bytes total
+'
+' Clears HUB RAM only.
+' Nothing is sent to the OLED.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Sends all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' The framebuffer is arranged
+' exactly like SSD1306 display RAM.
+'
+' Each group of 8 vertical pixels
+' occupies one byte.
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' HUB FILLED RECTANGLE
+'
+' Rectangle:
+'
+' X = 30 through 97
+' Y = 18 through 45
+'
+' Width  = 68 pixels
+' Height = 28 pixels
+'
+' Every pixel is first written
+' into the HUB framebuffer.
+' =========================
+
+draw_hub_filled_rectangle
+
+    mov     ypos, #18
+    mov     row_count, #28
+
+filled_rect_row_loop
+
+    mov     xpos, #30
+    mov     column_count, #68
+
+filled_rect_column_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    column_count, #filled_rect_column_loop
+
+    add     ypos, #1
+
+    djnz    row_count, #filled_rect_row_loop
+
+    ret
+
+' =========================
+' DRAW POINT LIST
+'
+' Each point in HUB RAM is:
+'
+' byte X
+' byte Y
+'
+' point_ptr is dedicated to
+' graphics data.
+'
+' ptr is reserved for framebuffer
+' addressing inside set_pixel.
+'
+' Keeping these pointers separate
+' prevents set_pixel from destroying
+' the point-list position.
+' =========================
+
+draw_point_list
+
+point_list_loop
+
+    rdbyte  xpos, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  ypos, point_ptr
+    add     point_ptr, #1
+
+    call    #set_pixel
+
+    djnz    point_count, #point_list_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+point_ptr       res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+row_count       res 1
+column_count    res 1
+point_count     res 1
+
+' =========================
+' HUB RAM
+' =========================
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome
+'
+' 128 columns
+' 8 pages
+'
+' 128 x 8 = 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' OVERLAPPING CIRCLE
+'
+' Center:
+'
+' X = 76
+' Y = 32
+'
+' Radius:
+'
+' 18 pixels
+'
+' 144 connected points
+'
+' Every point is adjacent to the
+' next point horizontally,
+' vertically, or diagonally.
+'
+' This prevents the dotted-circle
+' effect seen with sparse point
+' tables.
+'
+' Because the rectangle was drawn
+' first, this circle is ORed into
+' the same HUB framebuffer.
+' =========================
+
+overlap_circle_points
+
+    byte    94,32,94,33,94,34,94,35,94,36,93,36,93,37,93,38
+    byte    93,39,92,39,92,40,92,41,91,41,91,42,91,43,90,43
+    byte    90,44,89,44,89,45,88,45,88,46,87,46,87,47,86,47
+    byte    85,47,85,48,84,48,83,48,83,49,82,49,81,49,80,49
+    byte    80,50,79,50,78,50,77,50,76,50,75,50,74,50,73,50
+    byte    72,50,72,49,71,49,70,49,69,49,69,48,68,48,67,48
+    byte    67,47,66,47,65,47,65,46,64,46,64,45,63,45,63,44
+    byte    62,44,62,43,61,43,61,42,61,41,60,41,60,40,60,39
+    byte    59,39,59,38,59,37,59,36,58,36,58,35,58,34,58,33
+    byte    58,32,58,31,58,30,58,29,58,28,59,28,59,27,59,26
+    byte    59,25,60,25,60,24,60,23,61,23,61,22,61,21,62,21
+    byte    62,20,63,20,63,19,64,19,64,18,65,18,65,17,66,17
+    byte    67,17,67,16,68,16,69,16,69,15,70,15,71,15,72,15
+    byte    72,14,73,14,74,14,75,14,76,14,77,14,78,14,79,14
+    byte    80,14,80,15,81,15,82,15,83,15,83,16,84,16,85,16
+    byte    85,17,86,17,87,17,87,18,88,18,88,19,89,19,89,20
+    byte    90,20,90,21,91,21,91,22,91,23,92,23,92,24,92,25
+    byte    93,25,93,26,93,27,93,28,94,28,94,29,94,30,94,31

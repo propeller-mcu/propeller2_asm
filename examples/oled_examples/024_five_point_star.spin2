@@ -1,0 +1,476 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 024 / 119
+'
+' Five Point Star
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw five point star
+    '
+    ' Image width  = 48 pixels
+    ' Image height = 48 pixels
+    '
+    ' X = 40 through 87
+    ' Y = 8 through 55
+    '
+    ' The star outline was
+    ' generated from actual
+    ' five-point geometry
+    ' and converted into
+    ' OLED page bytes.
+
+    call    #draw_star
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' DRAW FIVE POINT STAR
+'
+' Compact 48 x 48 image
+'
+' Starting X = 40
+' Starting page = 1
+'
+' Width  = 48 bytes
+' Height = 6 OLED pages
+'
+' 6 x 48
+' = 288 HUB bytes
+' =========================
+
+draw_star
+
+    mov     ptr, ##star_image
+    mov     page, #1
+    mov     page_count, #6
+
+star_page_loop
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     xpos, #40
+    call    #set_xpos
+
+    mov     count, #48
+
+star_column_loop
+
+    rdbyte  cmd, ptr
+    call    #send_data
+
+    add     ptr, #1
+
+    djnz    count, #star_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #star_page_loop
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+x           res 1
+page        res 1
+xpos        res 1
+temp        res 1
+ptr         res 1
+page_count  res 1
+
+
+' =========================
+' FIVE POINT STAR IMAGE
+'
+' 48 x 48 pixels
+'
+' Authored for SSD1306
+' orientation $A0 / $C0
+'
+' No software rotation
+'
+' 6 pages x 48 bytes
+' = 288 HUB bytes
+' =========================
+
+    orgh
+
+star_image
+
+' -------------------------
+' PAGE 1
+' Y = 8 through 15
+'
+' Top point
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$40,$C0,$C0,$80,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$80,$C0,$C0,$40,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 2
+' Y = 16 through 23
+'
+' Upper inner edges
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$07,$7F,$F9,$83,$03
+    byte    $06,$0E,$0C,$18,$18,$30,$60,$60
+    byte    $60,$60,$30,$18,$18,$0C,$0E,$06
+    byte    $03,$83,$F9,$7F,$07,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 3
+' Y = 24 through 31
+'
+' Left and right points
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$80,$C0,$67,$7F,$38
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $38,$7F,$67,$C0,$80,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 4
+' Y = 32 through 39
+'
+' Lower star body
+' -------------------------
+
+    byte    $00,$00,$00,$C0,$E0,$F0,$D8,$DC
+    byte    $CE,$C7,$C3,$C1,$C0,$C0,$80,$80
+    byte    $80,$80,$80,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$80,$80,$80
+    byte    $80,$80,$C0,$C0,$C1,$C3,$C7,$CE
+    byte    $DC,$D8,$F0,$E0,$C0,$00,$00,$00
+
+
+' -------------------------
+' PAGE 5
+' Y = 40 through 47
+'
+' Lower inner edges
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$01,$03,$1F,$7C,$E0,$80,$00
+    byte    $00,$80,$E0,$7C,$1F,$03,$01,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 6
+' Y = 48 through 55
+'
+' Two lower points
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$03,$0F,$3C
+    byte    $3C,$0F,$03,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00

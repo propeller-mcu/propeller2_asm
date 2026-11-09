@@ -1,0 +1,693 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 057 / 119
+'
+' HUB Heart
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_buffer
+    call    #draw_hub_heart
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    ' Normal COM scan direction.
+    '
+    ' Coordinate convention:
+    '
+    ' Y = 0  top
+    ' Y = 63 bottom
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes.
+'
+' The OLED itself is not
+' changed until push_buffer.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+    add     ptr, #4
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Transfers all 1024 bytes
+' from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' Address:
+'
+' page   = ypos / 8
+' offset = page * 128 + xpos
+'
+' The selected bit is ORed into
+' the existing framebuffer byte.
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' FILL HORIZONTAL SPAN
+'
+' Inputs:
+'
+' span_start = first X
+' span_end   = last X
+' ypos       = row
+'
+' Both endpoints are included.
+' =========================
+
+fill_span
+
+    mov     xpos, span_start
+
+    mov     span_count, span_end
+    sub     span_count, span_start
+    add     span_count, #1
+
+fill_span_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    span_count, #fill_span_loop
+
+    ret
+
+' =========================
+' HUB HEART
+'
+' The heart is stored as one
+' scanline description per row.
+'
+' Each HUB row contains:
+'
+' left1, right1, left2, right2
+'
+' The first rows use TWO spans
+' to create the two rounded lobes
+' and center notch.
+'
+' Lower rows use ONE span as
+' the heart narrows to a point.
+'
+' $FF means there is no
+' second span on that row.
+' =========================
+
+draw_hub_heart
+
+    mov     heart_ptr, ##heart_rows
+    mov     ypos, #10
+    mov     heart_row_count, #44
+
+heart_row_loop
+
+    ' -------------------------
+    ' Read first span
+    ' -------------------------
+
+    rdbyte  span_start, heart_ptr
+    add     heart_ptr, #1
+
+    rdbyte  span_end, heart_ptr
+    add     heart_ptr, #1
+
+    ' -------------------------
+    ' Read optional second span
+    ' -------------------------
+
+    rdbyte  span2_start, heart_ptr
+    add     heart_ptr, #1
+
+    rdbyte  span2_end, heart_ptr
+    add     heart_ptr, #1
+
+    ' -------------------------
+    ' Draw first span
+    ' -------------------------
+
+    call    #fill_span
+
+    ' -------------------------
+    ' $FF means this row only
+    ' contains one span.
+    ' -------------------------
+
+    cmp     span2_start, #$FF wz
+if_z jmp   #heart_next_row
+
+    mov     span_start, span2_start
+    mov     span_end, span2_end
+
+    call    #fill_span
+
+heart_next_row
+
+    add     ypos, #1
+
+    djnz    heart_row_count, #heart_row_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd              res 1
+count            res 1
+spi_count        res 1
+
+page             res 1
+page_count       res 1
+
+xpos             res 1
+ypos             res 1
+
+temp             res 1
+ptr              res 1
+heart_ptr        res 1
+
+value            res 1
+offset           res 1
+mask             res 1
+
+span_start       res 1
+span_end         res 1
+
+span2_start      res 1
+span2_end        res 1
+
+span_count       res 1
+heart_row_count  res 1
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+' = 1024 bytes
+' =========================
+
+rot_src          res 1
+rot_dst          res 1
+rot_count        res 1
+
+    orgh
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' HEART SCANLINE DATA
+'
+' Four bytes per screen row:
+'
+' left1, right1,
+' left2, right2
+'
+' $FF,$FF means that no second
+' span exists for that row.
+'
+' Rows correspond to
+' Y = 10 through Y = 53.
+'
+' The heart is centered around
+' X = 64.
+' =========================
+
+heart_rows
+
+    ' Y = 10
+    byte    45,51,76,82
+
+    ' Y = 11
+    byte    42,54,73,85
+
+    ' Y = 12
+    byte    40,56,71,87
+
+    ' Y = 13
+    byte    38,58,69,89
+
+    ' Y = 14
+    byte    37,59,68,90
+
+    ' Y = 15
+    byte    36,60,67,91
+
+    ' Y = 16
+    byte    35,61,66,92
+
+    ' Y = 17
+    byte    35,62,65,92
+
+    ' Y = 18
+    byte    35,63,64,92
+
+    ' Y = 19
+    byte    35,92,$FF,$FF
+
+    ' Y = 20
+    byte    35,92,$FF,$FF
+
+    ' Y = 21
+    byte    35,92,$FF,$FF
+
+    ' Y = 22
+    byte    35,92,$FF,$FF
+
+    ' Y = 23
+    byte    36,91,$FF,$FF
+
+    ' Y = 24
+    byte    36,91,$FF,$FF
+
+    ' Y = 25
+    byte    37,90,$FF,$FF
+
+    ' Y = 26
+    byte    38,89,$FF,$FF
+
+    ' Y = 27
+    byte    39,88,$FF,$FF
+
+    ' Y = 28
+    byte    40,87,$FF,$FF
+
+    ' Y = 29
+    byte    41,86,$FF,$FF
+
+    ' Y = 30
+    byte    42,85,$FF,$FF
+
+    ' Y = 31
+    byte    43,84,$FF,$FF
+
+    ' Y = 32
+    byte    44,83,$FF,$FF
+
+    ' Y = 33
+    byte    45,82,$FF,$FF
+
+    ' Y = 34
+    byte    46,81,$FF,$FF
+
+    ' Y = 35
+    byte    47,80,$FF,$FF
+
+    ' Y = 36
+    byte    48,79,$FF,$FF
+
+    ' Y = 37
+    byte    49,78,$FF,$FF
+
+    ' Y = 38
+    byte    50,77,$FF,$FF
+
+    ' Y = 39
+    byte    51,76,$FF,$FF
+
+    ' Y = 40
+    byte    52,75,$FF,$FF
+
+    ' Y = 41
+    byte    53,74,$FF,$FF
+
+    ' Y = 42
+    byte    54,73,$FF,$FF
+
+    ' Y = 43
+    byte    55,72,$FF,$FF
+
+    ' Y = 44
+    byte    56,71,$FF,$FF
+
+    ' Y = 45
+    byte    57,70,$FF,$FF
+
+    ' Y = 46
+    byte    58,69,$FF,$FF
+
+    ' Y = 47
+    byte    59,68,$FF,$FF
+
+    ' Y = 48
+    byte    60,67,$FF,$FF
+
+    ' Y = 49
+    byte    61,66,$FF,$FF
+
+    ' Y = 50
+    byte    62,65,$FF,$FF
+
+    ' Y = 51
+    byte    63,65,$FF,$FF
+
+    ' Y = 52
+    byte    63,64,$FF,$FF
+
+    ' Y = 53
+    byte    64,64,$FF,$FF

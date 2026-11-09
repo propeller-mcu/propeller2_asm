@@ -1,0 +1,566 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 016 / 119
+'
+' Plus Sign
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw plus sign
+    '
+    ' Image width  = 40 pixels
+    ' Image height = 40 pixels
+    '
+    ' X = 44 through 83
+    ' Y = 12 through 51
+    '
+    ' The plus sign is stored
+    ' as image bytes in HUB RAM.
+    '
+    ' Only the area containing
+    ' the image is stored.
+    '
+    ' 6 pages
+    ' x
+    ' 40 bytes
+    '
+    ' = 240 bytes
+
+    call    #draw_plus
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    ' Select page 0-7
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Column low nibble = 0
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    ' Column high nibble = 0
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    ' Set low column nibble
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ' Set high column nibble
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+' $00 = 00000000
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' DRAW PLUS
+'
+' The plus sign is stored
+' as a compact image.
+'
+' Starting X = 44
+' Starting page = 1
+'
+' Width = 40 bytes
+' Height = 6 OLED pages
+'
+' Each HUB byte becomes
+' one OLED column inside
+' the current page.
+'
+' Unlike a full-screen image,
+' only the bytes containing
+' the plus sign are stored.
+' =========================
+
+draw_plus
+
+    ' Point to image data
+
+    mov     ptr, ##plus_image
+
+    ' Image begins on page 1
+
+    mov     page, #1
+
+    ' Image uses 6 pages
+
+    mov     page_count, #6
+
+plus_page_loop
+
+    ' Select current page
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Image begins at X = 44
+
+    mov     xpos, #44
+    call    #set_xpos
+
+    ' Each image row
+    ' contains 40 bytes
+
+    mov     count, #40
+
+plus_column_loop
+
+    ' Read one image byte
+    ' from HUB RAM
+
+    rdbyte  cmd, ptr
+
+    ' Send it to the OLED
+
+    call    #send_data
+
+    ' Move to next image byte
+
+    add     ptr, #1
+
+    djnz    count, #plus_column_loop
+
+    ' Move to next OLED page
+
+    add     page, #1
+
+    djnz    page_count, #plus_page_loop
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    ' Get bit 7 of cmd
+
+    testb   cmd, #7 wc
+
+    ' Put bit on MOSI
+
+    outc    #oled_mosi
+
+    ' Allow MOSI to settle
+
+    waitx   ##100
+
+    ' Clock HIGH
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    ' Clock LOW
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    ' Move next bit into bit 7
+
+    rol     cmd, #1
+
+    ' Repeat for 8 bits
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+x           res 1
+page        res 1
+xpos        res 1
+temp        res 1
+ptr         res 1
+page_count  res 1
+
+
+' =========================
+' PLUS SIGN IMAGE
+'
+' 40 pixels wide
+' 40 pixels tall
+'
+' Stored as:
+'
+' 6 OLED pages
+' x
+' 40 bytes per page
+'
+' = 240 HUB bytes
+'
+' Vertical bar:
+'
+' X = 60 through 67
+'
+' Horizontal bar:
+'
+' Y = 28 through 35
+' =========================
+
+    orgh
+
+
+' NOTE: Bitmap data below is stored 180 degrees rotated in HUB RAM.
+' The OLED is intentionally initialized with $A0 / $C0 (no controller remap).
+' This software compensation makes the image appear upright in the chosen
+' physical orientation of this 2.42-inch SSD1309 module.
+
+plus_image
+
+' -------------------------
+' PAGE 1
+'
+' Y = 8 through 15
+'
+' Plus begins at Y = 12.
+' Vertical bar uses bits 4-7.
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 2
+'
+' Y = 16 through 23
+'
+' Full vertical bar.
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 3
+'
+' Y = 24 through 31
+'
+' Horizontal bar begins
+' at Y = 28.
+'
+' $F0 turns on bits 4-7.
+'
+' Center $FF bytes contain
+' both horizontal and
+' vertical bars.
+' -------------------------
+
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+
+
+' -------------------------
+' PAGE 4
+'
+' Y = 32 through 39
+'
+' Horizontal bar ends
+' at Y = 35.
+'
+' $0F turns on bits 0-3.
+' -------------------------
+
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+
+
+' -------------------------
+' PAGE 5
+'
+' Y = 40 through 47
+'
+' Full vertical bar.
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+
+
+' -------------------------
+' PAGE 6
+'
+' Y = 48 through 55
+'
+' Plus ends at Y = 51.
+'
+' Vertical bar uses bits 0-3.
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00

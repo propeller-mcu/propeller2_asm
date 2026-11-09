@@ -1,0 +1,567 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 066 / 119
+'
+' HUB Sprite Mask
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    ' Build a striped
+    ' HUB framebuffer.
+
+    call    #build_mask_background
+
+    ' Draw the sprite using
+    ' a separate mask.
+
+    call    #draw_masked_sprite
+
+    ' Transfer the finished
+    ' framebuffer to the OLED.
+
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+
+    ' Read the framebuffer
+    ' backward.
+    '
+    ' Reversing byte order
+    ' and reversing the bits
+    ' inside every byte creates
+    ' the required 180-degree
+    ' software rotation.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE
+' FOR DISPLAY
+'
+' Reverses all 8 bits in cmd.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' BUILD MASK BACKGROUND
+'
+' Fill all 1024 framebuffer
+' bytes with:
+'
+' $11 = %00010001
+'
+' This makes a repeating
+' striped background.
+' =========================
+
+build_mask_background
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##1024
+    mov     value, ##$11
+
+mask_background_loop
+
+    wrbyte  value, ptr
+
+    add     ptr, #1
+
+    djnz    count, #mask_background_loop
+
+    ret
+
+' =========================
+' DRAW MASKED SPRITE
+'
+' Destination:
+'
+' page = 3
+' X    = 60
+'
+' A masked sprite combines
+' three pieces of data:
+'
+' 1. Existing background
+' 2. Sprite mask
+' 3. Sprite image
+'
+' Formula:
+'
+' background AND NOT mask
+'
+' then
+'
+' result OR sprite
+'
+' This lets the sprite replace
+' only the pixels covered by
+' its mask.
+' =========================
+
+draw_masked_sprite
+
+    ' Calculate framebuffer
+    ' destination offset:
+    '
+    ' page * 128 + X
+
+    mov     offset, #3
+    shl     offset, #7
+    add     offset, #60
+
+    ' Destination pointer.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    ' Mask data pointer.
+
+    mov     source_ptr, ##sprite_mask
+
+    ' Sprite image pointer.
+
+    mov     source_ptr2, ##sprite_image
+
+    ' Sprite is 8 columns wide.
+
+    mov     count, #8
+
+masked_sprite_loop
+
+    ' Read existing background.
+
+    rdbyte  value, ptr
+
+    ' Read sprite mask.
+
+    rdbyte  mask, source_ptr
+
+    ' Invert the mask.
+    '
+    ' Example:
+    '
+    ' mask:
+    '
+    ' 00111100
+    '
+    ' becomes:
+    '
+    ' 11000011
+
+    xor     mask, ##$FF
+
+    ' Clear the background bits
+    ' where the sprite will go.
+
+    and     value, mask
+
+    ' Read sprite image byte.
+
+    rdbyte  temp, source_ptr2
+
+    ' Add sprite pixels into
+    ' the cleared opening.
+
+    or      value, temp
+
+    ' Store composite result
+    ' back into framebuffer.
+
+    wrbyte  value, ptr
+
+    ' Advance all three
+    ' byte pointers.
+
+    add     ptr, #1
+    add     source_ptr, #1
+    add     source_ptr2, #1
+
+    djnz    count, #masked_sprite_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+source_ptr      res 1
+source_ptr2     res 1
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' = 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' SPRITE IMAGE
+'
+' Actual pixels that should
+' appear on the display.
+'
+' 8 bytes
+' =
+' 8 columns x 8 pixels
+' =========================
+
+sprite_image
+
+    byte    $3C,$42,$A5,$81
+    byte    $81,$A5,$42,$3C
+
+' =========================
+' SPRITE MASK
+'
+' The mask defines which
+' background pixels belong
+' to the sprite's area.
+'
+' Before use, each mask byte
+' is inverted.
+'
+' Original mask:
+'
+'     MASK
+'
+' becomes:
+'
+'     NOT MASK
+'
+' The framebuffer is ANDed
+' with that inverted mask
+' before the sprite pixels
+' are ORed into place.
+' =========================
+
+sprite_mask
+
+    byte    $3C,$7E,$FF,$FF
+    byte    $FF,$FF,$7E,$3C

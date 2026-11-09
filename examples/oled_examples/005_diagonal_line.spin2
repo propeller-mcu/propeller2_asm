@@ -1,0 +1,422 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 005 / 119
+'
+' Diagonal Line
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw diagonal line
+    '
+    ' Start X = 32
+    ' Start Y = 16
+    ' Length  = 32 pixels
+
+    mov     xpos, #95
+    mov     ypos, #47
+    mov     line_count, #32
+
+    call    #draw_diag
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    ' Select page 0-7
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Column low nibble = 0
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    ' Column high nibble = 0
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    ' Set low column nibble
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ' Set high column nibble
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+' $00 = 00000000
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' DRAW DIAGONAL LINE
+'
+' xpos        = starting X
+' ypos        = starting Y
+' line_count  = line length
+'
+' Each pixel moves:
+'
+' X = X + 1
+' Y = Y + 1
+' =========================
+
+draw_diag
+
+diag_loop
+
+    call    #draw_pixel
+
+    sub     xpos, #1
+    sub     ypos, #1
+
+    djnz    line_count, #diag_loop
+
+    ret
+
+
+' =========================
+' DRAW PIXEL
+'
+' xpos = 0 - 127
+' ypos = 0 - 63
+' =========================
+
+draw_pixel
+
+    ' Find OLED page
+    '
+    ' page = ypos / 8
+
+    mov     page, ypos
+    shr     page, #3
+
+    ' Select page
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Set X position
+
+    call    #set_xpos
+
+    ' Create pixel bit mask
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+
+bit_loop
+
+    tjz     temp, #bit_done
+
+    shl     mask, #1
+    sub     temp, #1
+
+    jmp     #bit_loop
+
+bit_done
+
+    ' Send one byte containing
+    ' the single pixel
+
+    mov     cmd, mask
+    call    #send_data
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    ' Get bit 7 of cmd
+
+    testb   cmd, #7 wc
+
+    ' Put bit on MOSI
+
+    outc    #oled_mosi
+
+    ' Allow MOSI to settle
+
+    waitx   ##100
+
+    ' Clock HIGH
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    ' Clock LOW
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    ' Move next bit into bit 7
+
+    rol     cmd, #1
+
+    ' Repeat for 8 bits
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+x           res 1
+page        res 1
+xpos        res 1
+ypos        res 1
+mask        res 1
+temp        res 1
+line_count  res 1

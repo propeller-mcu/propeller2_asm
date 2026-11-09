@@ -1,0 +1,386 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 033 / 119
+'
+' HUB Buffer Fill
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    call    #fill_buffer_pattern
+    call    #push_buffer
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+'
+' Framebuffer is stored directly
+' for the $A0 / $C0 orientation.
+'
+' No software rotation.
+'
+' 8 pages x 128 bytes
+' = 1024 bytes
+' =========================
+
+push_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+    call    #send_data
+
+    add     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' HUB BUFFER FILL
+'
+' Writes the same byte to all
+' 1024 HUB framebuffer locations.
+'
+' $18 = %00011000
+'
+' This produces two horizontal
+' white pixel rows inside every
+' 8-pixel OLED page.
+'
+' Because all 128 columns contain
+' the same value, these become
+' horizontal bands across the
+' full display.
+' =========================
+
+fill_buffer_pattern
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##1024
+    mov     value, #$18
+
+buffer_fill_loop
+
+    wrbyte  value, ptr
+
+    add     ptr, #1
+
+    djnz    count, #buffer_fill_loop
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+spi_count   res 1
+page        res 1
+page_count  res 1
+xpos        res 1
+temp        res 1
+ptr         res 1
+value       res 1
+
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+' = 1024 bytes
+'
+' Page layout:
+'
+' page 0 = Y  0 through  7
+' page 1 = Y  8 through 15
+' page 2 = Y 16 through 23
+' page 3 = Y 24 through 31
+' page 4 = Y 32 through 39
+' page 5 = Y 40 through 47
+' page 6 = Y 48 through 55
+' page 7 = Y 56 through 63
+'
+' Graphics are authored directly
+' for SSD1306 $A0 / $C0.
+'
+' No 180-degree software rotation.
+' =========================
+
+    orgh
+
+frame_buffer
+
+    byte    0[1024]

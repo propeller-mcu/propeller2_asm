@@ -1,0 +1,507 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 030 / 119
+'
+' Filled Rounded Rectangle
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw filled rounded
+    ' rectangle
+    '
+    ' Width  = 72 pixels
+    ' Height = 40 pixels
+    '
+    ' X = 28 through 99
+    ' Y = 12 through 51
+    '
+    ' Corner radius = 8 pixels
+    '
+    ' This uses the same
+    ' geometry as the previous
+    ' rounded rectangle outline.
+    '
+    ' Every pixel inside the
+    ' rounded shape is turned on.
+
+    call    #draw_filled_rounded_rectangle
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' DRAW FILLED ROUNDED
+' RECTANGLE
+'
+' 72 x 40 image
+'
+' X = 28 through 99
+' Y = 12 through 51
+'
+' Corner radius = 8
+'
+' The image occupies
+' OLED pages 1 through 6.
+'
+' 6 pages x 72 bytes
+' = 432 HUB bytes
+' =========================
+
+draw_filled_rounded_rectangle
+
+    mov     ptr, ##filled_rounded_rectangle_image
+    mov     page, #1
+    mov     page_count, #6
+
+filled_rounded_page_loop
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     xpos, #28
+    call    #set_xpos
+
+    mov     count, #72
+
+filled_rounded_column_loop
+
+    rdbyte  cmd, ptr
+    call    #send_data
+
+    add     ptr, #1
+
+    djnz    count, #filled_rounded_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #filled_rounded_page_loop
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+x           res 1
+page        res 1
+xpos        res 1
+temp        res 1
+ptr         res 1
+page_count  res 1
+
+
+' =========================
+' FILLED ROUNDED RECTANGLE
+' IMAGE
+'
+' 72 x 40 pixels
+'
+' OLED position:
+'
+' X = 28 through 99
+' Y = 12 through 51
+'
+' Corner radius:
+'
+' 8 pixels
+'
+' Every pixel inside the
+' rounded rectangle is on.
+'
+' 6 pages x 72 bytes
+' = 432 HUB bytes
+' =========================
+
+    orgh
+
+
+' NOTE: Bitmap data below is stored 180 degrees rotated in HUB RAM.
+' The OLED is intentionally initialized with $A0 / $C0 (no controller remap).
+' This software compensation makes the image appear upright in the chosen
+' physical orientation of this 2.42-inch SSD1309 module.
+
+filled_rounded_rectangle_image
+
+' -------------------------
+' PAGE 1
+' Y = 8 through 15
+' -------------------------
+
+    byte    $00,$80,$C0,$E0,$E0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+    byte    $F0,$F0,$F0,$E0,$E0,$C0,$80,$00
+
+
+' -------------------------
+' PAGE 2
+' Y = 16 through 23
+' -------------------------
+
+    byte    $FE,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FE
+
+
+' -------------------------
+' PAGE 3
+' Y = 24 through 31
+'
+' Solid center
+' -------------------------
+
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+
+
+' -------------------------
+' PAGE 4
+' Y = 32 through 39
+'
+' Solid center
+' -------------------------
+
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+
+
+' -------------------------
+' PAGE 5
+' Y = 40 through 47
+' -------------------------
+
+    byte    $7F,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    byte    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$7F
+
+
+' -------------------------
+' PAGE 6
+' Y = 48 through 55
+' -------------------------
+
+    byte    $00,$01,$03,$07,$07,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+    byte    $0F,$0F,$0F,$07,$07,$03,$01,$00

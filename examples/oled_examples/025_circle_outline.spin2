@@ -1,0 +1,542 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 025 / 119
+'
+' Circle Outline
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw circle outline
+    '
+    ' Image width  = 51 pixels
+    ' Image height = 51 pixels
+    '
+    ' X = 38 through 88
+    ' Y = 6 through 56
+    '
+    ' This version uses a
+    ' single-pixel circle
+    ' generated from midpoint
+    ' circle symmetry.
+    '
+    ' The thinner outline gives
+    ' the circle a smoother
+    ' appearance on the
+    ' monochrome OLED.
+
+    call    #draw_circle
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE        ' Display off
+    call    #send_cmd
+
+    mov     cmd, #$D5        ' Display clock
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8        ' Multiplex ratio
+    call    #send_cmd
+
+    mov     cmd, #$3F        ' 64 rows
+    call    #send_cmd
+
+    mov     cmd, #$D3        ' Display offset
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40        ' Start line
+    call    #send_cmd
+
+    mov     cmd, #$A0        ' Normal segment direction
+    call    #send_cmd
+
+    mov     cmd, #$C0        ' Normal COM scan direction
+    call    #send_cmd
+
+    mov     cmd, #$DA        ' COM pin config
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81        ' Contrast
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20        ' Addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$02        ' Page addressing mode
+    call    #send_cmd
+
+    mov     cmd, #$A4        ' Use display RAM
+    call    #send_cmd
+
+    mov     cmd, #$A6        ' Normal display
+    call    #send_cmd
+
+    mov     cmd, #$8D        ' Charge pump
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF        ' Display on
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' DRAW CIRCLE OUTLINE
+'
+' 51 x 51 image
+'
+' X = 38 through 88
+' Y = 6 through 56
+'
+' Starting X = 38
+'
+' The image crosses all
+' 8 OLED pages.
+'
+' 8 pages x 51 bytes
+' = 408 HUB bytes
+' =========================
+
+draw_circle
+
+    mov     ptr, ##circle_image
+    mov     page, #0
+    mov     page_count, #8
+
+circle_page_loop
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     xpos, #38
+    call    #set_xpos
+
+    mov     count, #51
+
+circle_column_loop
+
+    rdbyte  cmd, ptr
+    call    #send_data
+
+    add     ptr, #1
+
+    djnz    count, #circle_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #circle_page_loop
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    ' Get bit 7 of cmd
+
+    testb   cmd, #7 wc
+
+    ' Put bit on MOSI
+
+    outc    #oled_mosi
+
+    ' Allow MOSI to settle
+
+    waitx   ##100
+
+    ' Clock HIGH
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    ' Clock LOW
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    ' Move next bit into bit 7
+
+    rol     cmd, #1
+
+    ' Repeat for 8 bits
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd         res 1
+count       res 1
+x           res 1
+page        res 1
+xpos        res 1
+temp        res 1
+ptr         res 1
+page_count  res 1
+
+
+' =========================
+' CIRCLE IMAGE
+'
+' 51 x 51 pixels
+'
+' OLED position:
+'
+' X = 38 through 88
+' Y = 6 through 56
+'
+' Local center:
+'
+' X = 25
+' Y = 25
+'
+' Radius = 25 pixels
+'
+' The circle uses exact
+' eight-way symmetry.
+'
+' Outline thickness:
+'
+' 1 pixel
+'
+' 8 pages x 51 bytes
+' = 408 HUB bytes
+' =========================
+
+    orgh
+
+
+' NOTE: Bitmap data below is stored 180 degrees rotated in HUB RAM.
+' The OLED is intentionally initialized with $A0 / $C0 (no controller remap).
+' This software compensation makes the image appear upright in the chosen
+' physical orientation of this 2.42-inch SSD1309 module.
+
+circle_image
+
+' -------------------------
+' PAGE 0
+' Y = 0 through 7
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$80,$80,$80,$80
+    byte    $80,$80,$80,$80,$80,$80,$80,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00
+
+
+' -------------------------
+' PAGE 1
+' Y = 8 through 15
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$80
+    byte    $40,$20,$10,$08,$08,$04,$04,$02
+    byte    $02,$01,$01,$01,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$01
+    byte    $01,$01,$02,$02,$04,$04,$08,$08
+    byte    $10,$20,$40,$80,$00,$00,$00,$00
+    byte    $00,$00,$00
+
+
+' -------------------------
+' PAGE 2
+' Y = 16 through 23
+' -------------------------
+
+    byte    $00,$00,$C0,$30,$0C,$02,$01,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$01,$02,$0C,$30
+    byte    $C0,$00,$00
+
+
+' -------------------------
+' PAGE 3
+' Y = 24 through 31
+'
+' Left and right sides
+' -------------------------
+
+    byte    $F8,$07,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$07,$F8
+
+
+' -------------------------
+' PAGE 4
+' Y = 32 through 39
+'
+' Left and right sides
+' -------------------------
+
+    byte    $3F,$C0,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$C0,$3F
+
+
+' -------------------------
+' PAGE 5
+' Y = 40 through 47
+' -------------------------
+
+    byte    $00,$01,$06,$18,$60,$80,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$80,$60,$18
+    byte    $06,$01,$00
+
+
+' -------------------------
+' PAGE 6
+' Y = 48 through 55
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$01,$02
+    byte    $04,$08,$10,$20,$20,$40,$40,$80
+    byte    $80,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$80,$80,$40,$40,$20,$20
+    byte    $10,$08,$04,$02,$01,$00,$00,$00
+    byte    $00,$00,$00
+
+
+' -------------------------
+' PAGE 7
+' Y = 56 through 63
+' -------------------------
+
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$01,$01,$01,$02,$02,$02,$02
+    byte    $02,$02,$02,$02,$02,$02,$02,$01
+    byte    $01,$01,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00,$00,$00,$00,$00,$00
+    byte    $00,$00,$00

@@ -1,0 +1,556 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 011 / 119
+'
+' Filled Triangle
+'
+' Category: OLED Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_screen
+
+    ' Draw filled triangle
+    '
+    ' Base:
+    '
+    ' X = 33 through 95
+    ' Y = 16
+    '
+    ' Apex:
+    '
+    ' X = 64
+    ' Y = 47
+    '
+    ' Every X position draws
+    ' one vertical filled
+    ' column beginning at
+    ' Y = 16.
+
+    call    #fill_triangle
+
+    jmp     #end
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    ' Give OLED time
+    ' to stabilize
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    ' Normal segment direction
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    ' Normal COM scan direction
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    ' Page addressing mode
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    ' Select page 0-7
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Column low nibble = 0
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    ' Column high nibble = 0
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 - 127
+' =========================
+
+set_xpos
+
+    ' Low column nibble
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ' High column nibble
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR SCREEN
+'
+' 8 pages
+' 128 bytes per page
+'
+' $00 = 00000000
+' =========================
+
+clear_screen
+
+    mov     page, #0
+
+clear_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+clear_column_loop
+
+    mov     cmd, #$00
+    call    #send_data
+
+    djnz    count, #clear_column_loop
+
+    add     page, #1
+
+    cmp     page, #8 wz
+
+    if_nz   jmp     #clear_page_loop
+
+    ret
+
+
+' =========================
+' FILL TRIANGLE
+'
+' The triangle is built
+' one X column at a time.
+'
+' X = 33 through 95
+'
+' Every column begins at:
+'
+' Y = 16
+'
+' The top of each column
+' rises toward X = 64.
+'
+' Examples:
+'
+' X = 33   ymax = 16
+' X = 40   ymax = 23
+' X = 48   ymax = 31
+' X = 56   ymax = 39
+' X = 64   ymax = 47
+' X = 72   ymax = 39
+' X = 80   ymax = 31
+' X = 88   ymax = 23
+' X = 95   ymax = 16
+' =========================
+
+fill_triangle
+
+    mov     xpos, #33
+    mov     column_count, #63
+
+triangle_column_loop
+
+    ' Determine whether
+    ' this is the left
+    ' or right half.
+    '
+    ' X = 33 through 64
+    ' uses left formula.
+    '
+    ' X = 65 through 95
+    ' uses right formula.
+
+    cmp     xpos, #65 wc
+
+    if_nc   jmp     #triangle_right_half
+
+triangle_left_half
+
+    ' ymax = xpos - 17
+
+    mov     ymax, xpos
+    sub     ymax, #17
+
+    jmp     #triangle_have_ymax
+
+triangle_right_half
+
+    ' ymax = 111 - xpos
+
+    mov     ymax, #111
+    sub     ymax, xpos
+
+triangle_have_ymax
+
+    call    #draw_filled_column
+
+    add     xpos, #1
+
+    djnz    column_count, #triangle_column_loop
+
+    ret
+
+
+' =========================
+' DRAW FILLED COLUMN
+'
+' xpos = X position
+'
+' Fill from:
+'
+' Y = 16
+'
+' through:
+'
+' Y = ymax
+'
+' Y = 16 begins exactly
+' at OLED page 2.
+'
+' Full intermediate pages
+' use $FF.
+'
+' The final page uses
+' a partial bit mask.
+' =========================
+
+draw_filled_column
+
+    ' Find page containing
+    ' ymax.
+    '
+    ' final_page = ymax / 8
+
+    mov     final_page, ymax
+    shr     final_page, #3
+
+    ' Every triangle column
+    ' starts on page 2
+    '
+    ' because Y = 16.
+
+    mov     page, #2
+
+filled_column_page_loop
+
+    ' Select current page
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    ' Move to current
+    ' X position
+
+    call    #set_xpos
+
+    ' Is this the page
+    ' containing ymax?
+
+    cmp     page, final_page wz
+
+    if_z    jmp     #filled_column_last_page
+
+    ' Entire page is inside
+    ' the triangle.
+    '
+    ' $FF =
+    '
+    ' 11111111
+
+    mov     cmd, #$FF
+    call    #send_data
+
+    add     page, #1
+
+    jmp     #filled_column_page_loop
+
+
+' -------------------------
+' LAST PAGE
+'
+' Turn on bits from
+' bit 0 through ymax.
+' -------------------------
+
+filled_column_last_page
+
+    ' Get position of
+    ' ymax inside page.
+
+    mov     temp, ymax
+    and     temp, #7
+
+    ' Include ymax itself.
+
+    add     temp, #1
+
+    ' Create:
+    '
+    ' (1 << temp) - 1
+    '
+    ' Example:
+    '
+    ' temp = 4
+    '
+    ' 00000001
+    ' << 4
+    '
+    ' 00010000
+    '
+    ' minus 1
+    '
+    ' 00001111
+
+    mov     mask, #1
+    shl     mask, temp
+    sub     mask, #1
+
+    mov     cmd, mask
+    call    #send_data
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI timing
+' =========================
+
+spi8
+
+    mov     x, #8
+
+.loop
+
+    ' Get bit 7 of cmd
+
+    testb   cmd, #7 wc
+
+    ' Put bit on MOSI
+
+    outc    #oled_mosi
+
+    ' Allow MOSI to settle
+
+    waitx   ##100
+
+    ' Clock HIGH
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    ' Clock LOW
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    ' Move next bit
+    ' into bit 7
+
+    rol     cmd, #1
+
+    ' Repeat for 8 bits
+
+    djnz    x, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd           res 1
+count         res 1
+x             res 1
+page          res 1
+xpos          res 1
+temp          res 1
+mask          res 1
+column_count  res 1
+ymax          res 1
+final_page    res 1

@@ -1,0 +1,505 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 092 / 119
+'
+' Vertical Wipe
+'
+' Category: HUB RAM Animation
+'
+' =========================================================
+
+CON
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+    org 0
+    asmclk
+
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+    call    #reset_oled
+    call    #oled_init
+
+
+' =========================
+' VERTICAL WIPE
+'
+' The screen begins with a
+' narrow filled horizontal band.
+'
+' The band grows from top to
+' bottom by two pixels each frame.
+'
+' Every column is filled from:
+'
+' Y = 0
+'
+' through:
+'
+' Y = wipe_height - 1
+'
+' When the wipe reaches the
+' entire 64-pixel screen height,
+' it pauses and starts again.
+' =========================
+
+animation_restart
+    mov     wipe_height, #2
+    mov     frame_count, #32
+
+vertical_wipe_loop
+    call    #clear_buffer
+
+
+' -------------------------
+' DRAW FILLED WIPE AREA
+'
+' There are 128 display columns.
+'
+' Each column receives one
+' vertical line whose height
+' is wipe_height.
+' -------------------------
+
+    mov     xpos, #0
+    mov     column_count, #128
+
+vertical_wipe_column
+    mov     ypos, #0
+    mov     line_count, wipe_height
+
+    call    #draw_vline
+
+    add     xpos, #1
+    djnz    column_count, #vertical_wipe_column
+
+
+' -------------------------
+' DISPLAY FRAME
+' -------------------------
+
+    call    #push_buffer
+    call    #short_delay
+
+
+' -------------------------
+' EXPAND WIPE
+'
+' Increase height two pixels
+' for the next animation frame.
+' -------------------------
+
+    add     wipe_height, #2
+    djnz    frame_count, #vertical_wipe_loop
+
+
+' -------------------------
+' HOLD FULL SCREEN
+' -------------------------
+
+    call    #frame_delay
+
+
+' -------------------------
+' START AGAIN
+' -------------------------
+
+    jmp     #animation_restart
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 framebuffer
+' bytes in HUB RAM.
+'
+' The OLED is not changed until
+' push_buffer is called.
+' =========================
+
+clear_buffer
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+    wrlong  value, ptr
+    add     ptr, #4
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+    djnz    count, #push_column_loop
+
+    add     page, #1
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+    shl     rot_dst, #1
+    testb   rot_src, #0 wc
+if_c  or    rot_dst, #1
+
+    shr     rot_src, #1
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+    ret
+
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' Each framebuffer byte stores
+' eight vertical OLED pixels.
+' =========================
+
+set_pixel
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+    wrbyte  value, ptr
+
+    ret
+
+
+' =========================
+' DRAW VERTICAL LINE
+'
+' xpos       = X position
+' ypos       = starting Y
+' line_count = number of pixels
+'
+' line_count is always at least
+' two in this demo.
+' =========================
+
+draw_vline
+
+draw_vline_loop
+    call    #set_pixel
+    add     ypos, #1
+    djnz    line_count, #draw_vline_loop
+
+    ret
+
+
+' =========================
+' SHORT DELAY
+'
+' Used between wipe frames.
+' =========================
+
+short_delay
+    waitx   ##6_000_000
+    ret
+
+
+' =========================
+' FRAME DELAY
+'
+' Holds the completed screen
+' before restarting.
+' =========================
+
+frame_delay
+    waitx   ##36_000_000
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+    mov     spi_count, #8
+
+.loop
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+    drvh    #oled_sck
+    waitx   ##100
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+    djnz    spi_count, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+ptr             res 1
+value           res 1
+offset          res 1
+mask            res 1
+
+line_count      res 1
+column_count    res 1
+wipe_height     res 1
+frame_count     res 1
+
+
+' =========================
+' HUB RAM
+' =========================
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' = 1024 bytes
+' =========================
+
+frame_buffer
+    byte    0[1024]

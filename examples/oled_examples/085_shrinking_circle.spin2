@@ -1,0 +1,575 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 085 / 119
+'
+' Shrinking Circle
+'
+' Category: HUB RAM Animation
+'
+' =========================================================
+
+CON
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+    org 0
+    asmclk
+
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+    call    #reset_oled
+    call    #oled_init
+
+    mov     radius, #24
+
+shrink_circle_loop
+    call    #clear_buffer
+
+    mov     center_x, #64
+    mov     center_y, #32
+
+    call    #draw_circle
+    call    #push_buffer
+    call    #frame_delay
+
+    sub     radius, #1
+
+    cmp     radius, #2 wc
+if_ae jmp   #shrink_circle_loop
+
+    mov     radius, #24
+    jmp     #shrink_circle_loop
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+' =========================
+
+clear_buffer
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+    wrlong  value, ptr
+    add     ptr, #4
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+' =========================
+
+push_buffer
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+    djnz    count, #push_column_loop
+
+    add     page, #1
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions. The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+    shl     rot_dst, #1
+    testb   rot_src, #0 wc
+if_c  or    rot_dst, #1
+
+    shr     rot_src, #1
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+    ret
+
+
+' =========================
+' SET PIXEL IN HUB RAM
+' =========================
+
+set_pixel
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+    wrbyte  value, ptr
+
+    ret
+
+
+' =========================
+' DRAW CIRCLE
+'
+' Uses:
+'
+'     X^2 + Y^2 = R^2
+'
+' For each Y position, X begins
+' at the radius and moves inward
+' until the point fits inside
+' the circle.
+'
+' The calculated X/Y pair is
+' mirrored into all eight
+' octants.
+'
+' This keeps the circle outline
+' connected while it shrinks.
+' =========================
+
+draw_circle
+    mov     radius_squared, radius
+    mul     radius_squared, radius
+
+    mov     circle_y, #0
+
+circle_y_loop
+    mov     circle_x, radius
+
+
+' -------------------------
+' FIND X FOR THIS Y
+' -------------------------
+
+circle_find_x
+    mov     x_squared, circle_x
+    mul     x_squared, circle_x
+
+    mov     y_squared, circle_y
+    mul     y_squared, circle_y
+
+    mov     distance_squared, x_squared
+    add     distance_squared, y_squared
+
+    cmp     distance_squared, radius_squared wc
+if_be jmp   #circle_x_found
+
+    sub     circle_x, #1
+    jmp     #circle_find_x
+
+
+' -------------------------
+' X POSITION FOUND
+' -------------------------
+
+circle_x_found
+    call    #plot_circle_points
+
+    add     circle_y, #1
+
+    cmp     circle_y, radius wc
+if_be jmp   #circle_y_loop
+
+    ret
+
+
+' =========================
+' PLOT 8 CIRCLE POINTS
+'
+' Every calculated point is
+' mirrored into all eight
+' octants of the circle.
+' =========================
+
+plot_circle_points
+
+
+' -------------------------
+' +X, +Y
+' -------------------------
+
+    mov     xpos, center_x
+    add     xpos, circle_x
+
+    mov     ypos, center_y
+    add     ypos, circle_y
+
+    call    #set_pixel
+
+
+' -------------------------
+' +Y, +X
+' -------------------------
+
+    mov     xpos, center_x
+    add     xpos, circle_y
+
+    mov     ypos, center_y
+    add     ypos, circle_x
+
+    call    #set_pixel
+
+
+' -------------------------
+' -Y, +X
+' -------------------------
+
+    mov     xpos, center_x
+    sub     xpos, circle_y
+
+    mov     ypos, center_y
+    add     ypos, circle_x
+
+    call    #set_pixel
+
+
+' -------------------------
+' -X, +Y
+' -------------------------
+
+    mov     xpos, center_x
+    sub     xpos, circle_x
+
+    mov     ypos, center_y
+    add     ypos, circle_y
+
+    call    #set_pixel
+
+
+' -------------------------
+' -X, -Y
+' -------------------------
+
+    mov     xpos, center_x
+    sub     xpos, circle_x
+
+    mov     ypos, center_y
+    sub     ypos, circle_y
+
+    call    #set_pixel
+
+
+' -------------------------
+' -Y, -X
+' -------------------------
+
+    mov     xpos, center_x
+    sub     xpos, circle_y
+
+    mov     ypos, center_y
+    sub     ypos, circle_x
+
+    call    #set_pixel
+
+
+' -------------------------
+' +Y, -X
+' -------------------------
+
+    mov     xpos, center_x
+    add     xpos, circle_y
+
+    mov     ypos, center_y
+    sub     ypos, circle_x
+
+    call    #set_pixel
+
+
+' -------------------------
+' +X, -Y
+' -------------------------
+
+    mov     xpos, center_x
+    add     xpos, circle_x
+
+    mov     ypos, center_y
+    sub     ypos, circle_y
+
+    call    #set_pixel
+
+    ret
+
+
+' =========================
+' FRAME DELAY
+' =========================
+
+frame_delay
+    waitx   ##18_000_000
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+    mov     spi_count, #8
+
+.loop
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+    drvh    #oled_sck
+    waitx   ##100
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+    djnz    spi_count, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd                 res 1
+count               res 1
+spi_count           res 1
+page                res 1
+page_count          res 1
+
+xpos                res 1
+ypos                res 1
+
+temp                res 1
+ptr                 res 1
+
+value               res 1
+offset              res 1
+mask                res 1
+
+center_x            res 1
+center_y            res 1
+
+radius              res 1
+radius_squared      res 1
+
+circle_x            res 1
+circle_y            res 1
+
+x_squared           res 1
+y_squared           res 1
+distance_squared    res 1
+
+
+' =========================
+' HUB RAM
+' =========================
+
+rot_src             res 1
+rot_dst             res 1
+rot_count           res 1
+
+    orgh
+
+
+' =========================
+' FRAMEBUFFER
+' =========================
+
+frame_buffer
+    byte    0[1024]

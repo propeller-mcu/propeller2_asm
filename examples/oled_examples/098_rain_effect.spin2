@@ -1,0 +1,622 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 098 / 119
+'
+' Rain Effect
+'
+' Category: HUB RAM Animation
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    mov     frame_index, #0
+
+' =========================
+' RAIN ANIMATION
+'
+' Each raindrop has:
+'
+' - an X position
+' - a starting Y position
+' - a length
+'
+' The frame number moves every
+' drop downward.
+'
+' Drops wrap from the bottom
+' of the OLED back to the top.
+'
+' Each drop is slightly diagonal
+' instead of perfectly vertical,
+' giving the rain more motion.
+' =========================
+
+rain_loop
+
+    call    #clear_buffer
+
+    mov     rain_ptr, ##rain_drop_data
+    mov     drop_count, #24
+
+' =========================
+' DRAW ALL RAINDROPS
+' =========================
+
+rain_drop_loop
+
+' -------------------------
+' READ DROP X
+' -------------------------
+
+    rdbyte  drop_x, rain_ptr
+    add     rain_ptr, #1
+
+' -------------------------
+' READ STARTING Y
+' -------------------------
+
+    rdbyte  drop_y, rain_ptr
+    add     rain_ptr, #1
+
+' -------------------------
+' READ DROP LENGTH
+' -------------------------
+
+    rdbyte  drop_length, rain_ptr
+    add     rain_ptr, #1
+
+' -------------------------
+' MOVE DROP DOWNWARD
+'
+' frame_index is added to the
+' original Y position.
+'
+' AND #63 wraps the drop around
+' the 64-pixel display height.
+' -------------------------
+
+    add     drop_y, frame_index
+    and     drop_y, #63
+
+' -------------------------
+' DRAW DROP
+'
+' Start at the stored X/Y.
+'
+' Each new pixel moves:
+'
+' X + 1
+' Y + 1
+'
+' producing a short diagonal
+' streak instead of a plain
+' vertical line.
+' -------------------------
+
+    mov     xpos, drop_x
+    mov     ypos, drop_y
+
+    mov     pixel_count, drop_length
+
+rain_pixel_loop
+
+    call    #set_pixel
+
+' -------------------------
+' MOVE DIAGONALLY DOWN
+' -------------------------
+
+    add     xpos, #1
+    add     ypos, #1
+
+' -------------------------
+' WRAP Y AT BOTTOM
+' -------------------------
+
+    and     ypos, #63
+
+' -------------------------
+' WRAP X AT RIGHT EDGE
+' -------------------------
+
+    and     xpos, #127
+
+    djnz    pixel_count, #rain_pixel_loop
+
+' -------------------------
+' NEXT RAINDROP
+' -------------------------
+
+    djnz    drop_count, #rain_drop_loop
+
+' =========================
+' DISPLAY COMPLETE FRAME
+' =========================
+
+    call    #push_buffer
+
+    call    #frame_delay
+
+' =========================
+' ADVANCE RAIN
+'
+' Move every drop downward by
+' three pixels for the next frame.
+'
+' This gives the rain a faster
+' falling appearance.
+' =========================
+
+    add     frame_index, #3
+
+    and     frame_index, #63
+
+    jmp     #rain_loop
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes.
+'
+' No OLED transfer happens
+' until push_buffer is called.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies the complete 128 x 64
+' HUB framebuffer into OLED RAM.
+'
+' 8 pages
+'
+' 128 bytes per page
+'
+' 1024 bytes total
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+    djnz    count, #push_column_loop
+
+    add     page, #1
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions.  The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+    testb   rot_src, #0 wc
+if_c or      rot_dst, #1
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' Framebuffer offset:
+'
+' page = Y / 8
+'
+' offset =
+'
+' page * 128 + X
+'
+' The individual Y bit is then
+' ORed into that framebuffer byte.
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+
+    shr     offset, #3
+    shl     offset, #7
+
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' FRAME DELAY
+'
+' Rain should move quickly,
+' so this delay is shorter
+' than the slower shape demos.
+' =========================
+
+frame_delay
+
+    waitx   ##5_000_000
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+rain_ptr        res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+frame_index     res 1
+
+drop_count      res 1
+drop_x          res 1
+drop_y          res 1
+drop_length     res 1
+
+pixel_count     res 1
+
+' =========================
+' HUB RAM
+' =========================
+
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' = 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' RAINDROP DATA
+'
+' Each drop uses three bytes:
+'
+' X position
+' Y starting position
+' Length
+'
+' The positions are intentionally
+' irregular so the rain does not
+' look like evenly spaced columns.
+' =========================
+
+rain_drop_data
+
+' X   Y   LENGTH
+
+    byte    2,   4,  3
+    byte    8,  38,  5
+    byte    14, 17,  3
+    byte    19, 52,  4
+
+    byte    25,  8,  5
+    byte    31, 29,  3
+    byte    36, 46,  4
+    byte    42, 13,  5
+
+    byte    48, 57,  3
+    byte    53, 25,  4
+    byte    59,  1,  5
+    byte    64, 41,  3
+
+    byte    70, 18,  4
+    byte    76, 50,  5
+    byte    81, 31,  3
+    byte    87,  6,  4
+
+    byte    92, 44,  5
+    byte    98, 21,  3
+    byte    104,59,  4
+    byte    109,11,  5
+
+    byte    114,35,  3
+    byte    118,54,  4
+    byte    122,16,  5
+    byte    126,47,  3

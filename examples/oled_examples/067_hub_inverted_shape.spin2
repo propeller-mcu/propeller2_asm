@@ -1,0 +1,611 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 067 / 119
+'
+' HUB Inverted Shape
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    ' Begin with an empty
+    ' HUB framebuffer.
+
+    call    #clear_buffer
+
+    ' Draw a solid rectangle
+    ' into HUB RAM.
+
+    call    #draw_hub_filled_rectangle
+
+    ' Invert every framebuffer
+    ' bit before displaying it.
+
+    call    #invert_buffer
+
+    ' Transfer the completed
+    ' framebuffer to the OLED.
+
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes
+' in HUB RAM.
+'
+' The OLED is not changed
+' until push_buffer runs.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies all 1024 framebuffer
+' bytes from HUB RAM to OLED RAM.
+' =========================
+
+push_buffer
+
+    ' Start at the final
+    ' framebuffer byte.
+    '
+    ' Reading the bytes backward
+    ' and reversing the bits in
+    ' every byte performs the
+    ' required 180-degree
+    ' software rotation.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE
+' FOR DISPLAY
+'
+' Reverses all 8 bits in cmd.
+'
+' Example:
+'
+' %10010000
+'
+' becomes:
+'
+' %00001001
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' The framebuffer layout is:
+'
+' offset =
+'
+' (ypos / 8) * 128
+'
+' +
+'
+' xpos
+'
+' Each byte represents
+' 8 vertical OLED pixels.
+' =========================
+
+set_pixel
+
+    ' Find OLED page.
+
+    mov     offset, ypos
+    shr     offset, #3
+
+    ' Multiply page by 128.
+
+    shl     offset, #7
+
+    ' Add X coordinate.
+
+    add     offset, xpos
+
+    ' Point to framebuffer byte.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    ' Read existing byte.
+
+    rdbyte  value, ptr
+
+    ' Start with bit 0.
+
+    mov     mask, #1
+
+    ' Determine Y position
+    ' inside the 8-pixel page.
+
+    mov     temp, ypos
+    and     temp, #7
+
+    ' Move the bit into
+    ' the correct position.
+
+    shl     mask, temp
+
+    ' Turn that pixel on
+    ' without disturbing
+    ' the other seven bits.
+
+    or      value, mask
+
+    ' Store the modified byte.
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' INVERT HUB FRAMEBUFFER
+'
+' Every framebuffer byte
+' is XORed with:
+'
+' $FF = %11111111
+'
+' Therefore:
+'
+' 0 bits become 1
+'
+' and
+'
+' 1 bits become 0.
+'
+' The entire screen image
+' becomes its inverse.
+' =========================
+
+invert_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##1024
+
+invert_buffer_loop
+
+    rdbyte  value, ptr
+
+    xor     value, ##$FF
+
+    wrbyte  value, ptr
+
+    add     ptr, #1
+
+    djnz    count, #invert_buffer_loop
+
+    ret
+
+' =========================
+' HUB FILLED RECTANGLE
+'
+' Rectangle:
+'
+' X = 30 through 97
+'
+' Y = 18 through 45
+'
+' Width  = 68 pixels
+'
+' Height = 28 pixels
+'
+' Two nested loops call
+' set_pixel once for every
+' pixel inside the rectangle.
+' =========================
+
+draw_hub_filled_rectangle
+
+    ' First row.
+
+    mov     ypos, #18
+
+    ' 28 rows total.
+
+    mov     row_count, #28
+
+filled_rect_row_loop
+
+    ' Begin each row
+    ' at X = 30.
+
+    mov     xpos, #30
+
+    ' Draw 68 pixels
+    ' across the row.
+
+    mov     column_count, #68
+
+filled_rect_column_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    column_count, #filled_rect_column_loop
+
+    ' Advance to next row.
+
+    add     ypos, #1
+
+    djnz    row_count, #filled_rect_row_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+'
+' Slow / beginner-friendly
+' bit-banged SPI.
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    ' Copy bit 7 of cmd
+    ' into carry.
+
+    testb   cmd, #7 wc
+
+    ' Output carry state
+    ' on MOSI.
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    ' Clock HIGH.
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    ' Clock LOW.
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    ' Rotate next data bit
+    ' into bit 7.
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+row_count       res 1
+column_count    res 1
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages
+'
+' x
+'
+' 128 bytes per page
+'
+' =
+'
+' 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]

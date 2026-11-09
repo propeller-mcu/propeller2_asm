@@ -1,0 +1,520 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 065 / 119
+'
+' HUB Two Sprites
+'
+' Category: HUB RAM Graphics
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+    call    #clear_buffer
+
+    ' Draw first sprite.
+
+    mov     sprite_x, #36
+    mov     sprite_page, #3
+
+    call    #blit_sprite
+
+    ' Draw second sprite.
+
+    mov     sprite_x, #84
+    mov     sprite_page, #3
+
+    call    #blit_sprite
+
+    ' Both sprites now exist
+    ' together in HUB RAM.
+
+    call    #push_buffer
+
+    jmp     #end
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+'
+' page = 0 through 7
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SET X POSITION
+'
+' xpos = 0 through 127
+' =========================
+
+set_xpos
+
+    mov     temp, xpos
+    and     temp, #$0F
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    mov     temp, xpos
+    shr     temp, #4
+    and     temp, #$0F
+    or      temp, #$10
+
+    mov     cmd, temp
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 bytes
+' in HUB RAM.
+'
+' The OLED is not changed
+' until push_buffer runs.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies the entire 1024-byte
+' framebuffer to the OLED.
+' =========================
+
+push_buffer
+
+    ' Read the framebuffer
+    ' backward.
+    '
+    ' Combined with reversing
+    ' the bits of every byte,
+    ' this performs the required
+    ' 180-degree software rotation
+    ' while the OLED remains
+    ' configured for $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+
+    djnz    count, #push_column_loop
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+' =========================
+' REVERSE DATA BYTE
+' FOR DISPLAY
+'
+' Reverse all 8 bits in cmd.
+'
+' Example:
+'
+' 10010000
+'
+' becomes:
+'
+' 00001001
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+    testb   rot_src, #0 wc
+
+if_c or    rot_dst, #1
+
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+
+    ret
+
+' =========================
+' BLIT 8 X 8 SPRITE
+'
+' sprite_page = destination page
+' sprite_x    = destination X
+'
+' The same sprite routine can
+' be called multiple times.
+'
+' Changing only sprite_x and
+' sprite_page changes where
+' the sprite is placed.
+'
+' Each sprite byte represents
+' one vertical 8-pixel column.
+' =========================
+
+blit_sprite
+
+    ' Calculate destination:
+    '
+    ' sprite_page * 128
+    ' + sprite_x
+
+    mov     offset, sprite_page
+    shl     offset, #7
+    add     offset, sprite_x
+
+    ' Destination pointer.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    ' Source sprite pointer.
+
+    mov     source_ptr, ##sprite_image
+
+    ' Eight columns wide.
+
+    mov     count, #8
+
+sprite_blit_loop
+
+    ' Read one sprite column.
+
+    rdbyte  value, source_ptr
+
+    ' Write it into the HUB
+    ' framebuffer.
+
+    wrbyte  value, ptr
+
+    ' Advance source and
+    ' destination.
+
+    add     source_ptr, #1
+    add     ptr, #1
+
+    djnz    count, #sprite_blit_loop
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+
+ptr             res 1
+source_ptr      res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+sprite_x        res 1
+sprite_page     res 1
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' = 1024 bytes
+'
+' Both sprites are written
+' into this same framebuffer
+' before the display is updated.
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' 8 X 8 SPRITE
+'
+' One copy of the sprite data
+' can be reused any number of
+' times.
+'
+' Demo 065 draws the same
+' sprite twice:
+'
+' First:
+'
+' X = 36
+' page = 3
+'
+' Second:
+'
+' X = 84
+' page = 3
+'
+' Both instances exist in
+' HUB RAM simultaneously.
+' =========================
+
+sprite_image
+
+    byte    $3C,$42,$A5,$81
+    byte    $81,$A5,$42,$3C
