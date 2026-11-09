@@ -1,0 +1,797 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 110 / 119
+'
+' Walking Sprite
+'
+' Category: Game Sprite Movement
+'
+' =========================================================
+
+CON
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+    org 0
+    asmclk
+
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN / GAME MOVEMENT
+' =========================
+
+main
+    call    #reset_oled
+    call    #oled_init
+
+    mov     player_x, #4
+    mov     player_y, #45
+
+    mov     enemy_x, #90
+    mov     enemy_y, #48
+
+    mov     frame, #0
+    mov     direction, #1
+    mov     phase, #0
+    mov     step_count, #0
+
+
+walk_loop
+
+    call    #clear_buffer
+
+    call    #draw_ground
+
+    call    #draw_player
+
+    call    #draw_enemy
+
+    call    #push_buffer
+
+    call    #frame_delay
+
+
+' -------------------------
+' MOVE PLAYER
+' -------------------------
+
+    add     player_x, #1
+
+    xor     frame, #1
+
+
+' -------------------------
+' RESET POSITION
+' -------------------------
+
+    cmp     player_x, #120 wz
+if_z    mov     player_x, #4
+
+
+    jmp     #walk_loop
+
+
+' =========================
+' DRAW GROUND
+' =========================
+
+draw_ground
+
+    mov     xpos, #0
+    mov     ypos, #54
+
+    mov     line_count, #128
+
+    call    #draw_hline
+
+    ret
+
+
+' =========================
+' DRAW PLAYER SPRITE
+'
+' Simple 5 x 8 stick character.
+'
+' frame = 0 or 1 changes legs.
+' =========================
+
+draw_player
+
+    mov     xpos, player_x
+    add     xpos, #2
+
+    mov     ypos, player_y
+
+    call    #set_pixel
+
+
+' HEAD / BODY
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #1
+
+    mov     line_count, #3
+
+    call    #draw_hline
+
+
+    mov     xpos, player_x
+    add     xpos, #2
+
+    mov     ypos, player_y
+    add     ypos, #2
+
+    mov     line_count, #4
+
+    call    #draw_vline
+
+
+    mov     xpos, player_x
+
+    mov     ypos, player_y
+    add     ypos, #3
+
+    mov     line_count, #5
+
+    call    #draw_hline
+
+
+' -------------------------
+' ANIMATE LEGS
+' -------------------------
+
+    cmp     frame, #0 wz
+if_z    jmp     #player_legs_a
+
+
+' =========================
+' PLAYER LEGS B
+' =========================
+
+player_legs_b
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #4
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    ret
+
+
+' =========================
+' PLAYER LEGS A
+' =========================
+
+player_legs_a
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    ret
+    ' =========================
+' DRAW ENEMY SPRITE
+'
+' Simple 5 x 4 enemy block.
+' =========================
+
+draw_enemy
+
+    mov     xpos, enemy_x
+    mov     ypos, enemy_y
+
+    mov     line_count, #5
+
+    call    #draw_hline
+
+
+    mov     xpos, enemy_x
+
+    mov     ypos, enemy_y
+    add     ypos, #1
+
+    mov     line_count, #5
+
+    call    #draw_hline
+
+
+    mov     xpos, enemy_x
+
+    mov     ypos, enemy_y
+    add     ypos, #2
+
+    mov     line_count, #5
+
+    call    #draw_hline
+
+
+    mov     xpos, enemy_x
+    add     xpos, #1
+
+    mov     ypos, enemy_y
+    add     ypos, #3
+
+    call    #set_pixel
+
+
+    mov     xpos, enemy_x
+    add     xpos, #3
+
+    mov     ypos, enemy_y
+    add     ypos, #3
+
+    call    #set_pixel
+
+
+    ret
+
+
+' =========================
+' DRAW HORIZONTAL LINE
+' =========================
+
+draw_hline
+
+draw_hline_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    line_count, #draw_hline_loop
+
+    ret
+
+
+' =========================
+' DRAW VERTICAL LINE
+' =========================
+
+draw_vline
+
+draw_vline_loop
+
+    call    #set_pixel
+
+    add     ypos, #1
+
+    djnz    line_count, #draw_vline_loop
+
+    ret
+
+
+' =========================
+' SET PIXEL IN HUB RAM
+'
+' xpos = 0 through 127
+' ypos = 0 through 63
+'
+' Finds the framebuffer byte
+' and sets the selected bit.
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+
+    shr     offset, #3
+
+    shl     offset, #7
+
+    add     offset, xpos
+
+
+    mov     ptr, ##frame_buffer
+
+    add     ptr, offset
+
+
+    rdbyte  value, ptr
+
+
+    mov     mask, #1
+
+    mov     temp, ypos
+
+    and     temp, #7
+
+    shl     mask, temp
+
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+
+    ret
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+    ' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+
+    mov     cmd, #$00
+
+    call    #send_cmd
+
+
+    mov     cmd, #$10
+
+    call    #send_cmd
+
+
+    ret
+
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' Clears all 1024 framebuffer
+' bytes in HUB RAM.
+'
+' OLED is unchanged until
+' push_buffer is called.
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+
+    mov     count, ##256
+
+    mov     value, #0
+
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+
+    ret
+
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Copies framebuffer data from
+' HUB RAM into OLED RAM.
+'
+' Framebuffer is transmitted
+' backwards and bit reversed
+' for display rotation.
+' =========================
+
+push_buffer
+
+    mov     ptr, ##frame_buffer
+
+    add     ptr, ##1023
+
+
+    mov     page, #0
+
+    mov     page_count, #8
+
+
+push_page_loop
+
+    call    #set_pos
+
+
+    mov     count, #128
+
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #rotate_display_byte
+
+    call    #send_data
+
+
+    sub     ptr, #1
+
+
+    djnz    count, #push_column_loop
+
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' Software rotation routine.
+'
+' Keeps OLED controller at:
+'
+' $A0 / $C0
+'
+' while correcting framebuffer
+' orientation.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+
+    mov     rot_dst, #0
+
+    mov     rot_count, #8
+
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+
+
+    testb   rot_src, #0 wc
+if_c    or      rot_dst, #1
+
+
+    shr     rot_src, #1
+
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+
+    mov     cmd, rot_dst
+
+
+    ret
+
+
+' =========================
+' FRAME DELAY
+'
+' Controls walking speed.
+' =========================
+
+frame_delay
+
+    waitx   ##36_000_000
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+
+    waitx   ##100
+
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+
+    rol     cmd, #1
+
+
+    djnz    spi_count, #.loop
+
+
+    ret
+
+    ' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+
+page            res 1
+page_count      res 1
+
+
+xpos            res 1
+ypos            res 1
+
+
+temp            res 1
+ptr             res 1
+value           res 1
+offset          res 1
+mask            res 1
+
+
+line_count      res 1
+
+
+' -------------------------
+' GAME VARIABLES
+' -------------------------
+
+player_x        res 1
+player_y        res 1
+enemy_x         res 1
+enemy_y         res 1
+
+
+frame           res 1
+
+direction       res 1
+phase           res 1
+step_count      res 1
+
+
+' =========================
+' HUB RAM
+' =========================
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+
+    orgh
+
+
+' =========================
+' FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+'
+' = 1024 bytes
+' =========================
+
+frame_buffer
+
+    byte    0[1024]

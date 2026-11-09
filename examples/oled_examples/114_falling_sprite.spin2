@@ -1,0 +1,748 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 114 / 119
+'
+' Falling Sprite
+'
+' Category: Game Sprite Movement
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+
+DAT
+
+    org 0
+    asmclk
+
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN / GAME MOVEMENT
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    mov     frame, #0
+
+
+fall_reset
+
+    mov     player_x, #62
+    mov     player_y, #5
+
+
+fall_loop
+
+    call    #clear_buffer
+
+
+    ' -------------------------
+    ' GROUND
+    ' -------------------------
+
+    mov     xpos, #0
+    mov     ypos, #54
+
+    mov     line_count, #128
+
+    call    #draw_hline
+
+
+    ' -------------------------
+    ' PLAYER
+    ' -------------------------
+
+    call    #draw_player
+
+
+    ' -------------------------
+    ' DISPLAY FRAME
+    ' -------------------------
+
+    call    #push_buffer
+
+    call    #frame_delay
+
+
+    ' -------------------------
+    ' FALL DOWN
+    ' -------------------------
+
+    add     player_y, #1
+
+    cmp     player_y, #45 wz
+
+if_z    jmp     #landed
+
+
+    jmp     #fall_loop
+
+
+' =========================
+' LANDED
+' =========================
+
+landed
+
+    waitx   ##20_000_000
+
+    jmp     #fall_reset
+
+
+' =========================
+' DRAW PLAYER SPRITE
+'
+' Simple 5 x 8 stick character.
+'
+' frame = 0 or 1 changes legs.
+' =========================
+
+draw_player
+
+    ' -------------------------
+    ' HEAD
+    ' -------------------------
+
+    mov     xpos, player_x
+    add     xpos, #2
+
+    mov     ypos, player_y
+
+    call    #set_pixel
+
+
+    ' -------------------------
+    ' HEAD / SHOULDERS
+    ' -------------------------
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #1
+
+    mov     line_count, #3
+
+    call    #draw_hline
+
+
+    ' -------------------------
+    ' BODY
+    ' -------------------------
+
+    mov     xpos, player_x
+    add     xpos, #2
+
+    mov     ypos, player_y
+    add     ypos, #2
+
+    mov     line_count, #4
+
+    call    #draw_vline
+
+
+    ' -------------------------
+    ' ARMS
+    ' -------------------------
+
+    mov     xpos, player_x
+
+    mov     ypos, player_y
+    add     ypos, #3
+
+    mov     line_count, #5
+
+    call    #draw_hline
+
+
+    ' -------------------------
+    ' LEGS
+    ' -------------------------
+
+    cmp     frame, #0 wz
+
+if_z    jmp     #player_legs_a
+
+
+' =========================
+' PLAYER LEGS FRAME B
+' =========================
+
+player_legs_b
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #4
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+    ret
+
+
+' =========================
+' PLAYER LEGS FRAME A
+' =========================
+
+player_legs_a
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #1
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #6
+
+    call    #set_pixel
+
+
+    mov     xpos, player_x
+    add     xpos, #3
+
+    mov     ypos, player_y
+    add     ypos, #7
+
+    call    #set_pixel
+
+    ret
+
+
+' =========================
+' DRAW HORIZONTAL LINE
+' =========================
+
+draw_hline
+
+draw_hline_loop
+
+    call    #set_pixel
+
+    add     xpos, #1
+
+    djnz    line_count, #draw_hline_loop
+
+    ret
+
+
+' =========================
+' DRAW VERTICAL LINE
+' =========================
+
+draw_vline
+
+draw_vline_loop
+
+    call    #set_pixel
+
+    add     ypos, #1
+
+    djnz    line_count, #draw_vline_loop
+
+    ret
+
+
+' =========================
+' SET PIXEL
+'
+' Logical coordinates:
+'
+' (0,0)      = visual top-left
+' (127,63)   = visual bottom-right
+'
+' OLED remains:
+'
+' Segment direction = $A0
+' COM direction     = $C0
+'
+' Physical mapping:
+'
+' physical_x = 127 - logical_x
+' physical_y = 63  - logical_y
+' =========================
+
+set_pixel
+
+    ' -------------------------
+    ' PHYSICAL X
+    ' -------------------------
+
+    mov     phys_x, #127
+
+    sub     phys_x, xpos
+
+
+    ' -------------------------
+    ' PHYSICAL Y
+    ' -------------------------
+
+    mov     phys_y, #63
+
+    sub     phys_y, ypos
+
+
+    ' -------------------------
+    ' PAGE
+    ' -------------------------
+
+    mov     offset, phys_y
+
+    shr     offset, #3
+
+
+    ' -------------------------
+    ' PAGE * 128
+    ' -------------------------
+
+    shl     offset, #7
+
+
+    ' -------------------------
+    ' ADD PHYSICAL X
+    ' -------------------------
+
+    add     offset, phys_x
+
+
+    ' -------------------------
+    ' HUB ADDRESS
+    ' -------------------------
+
+    add     offset, ##frame_buffer
+
+
+    ' -------------------------
+    ' PIXEL MASK
+    ' -------------------------
+
+    mov     temp, phys_y
+
+    and     temp, #7
+
+    mov     mask, #1
+
+    shl     mask, temp
+
+
+    ' -------------------------
+    ' READ / MODIFY / WRITE
+    ' -------------------------
+
+    rdbyte  value, offset
+
+    or      value, mask
+
+    wrbyte  value, offset
+
+    ret
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+
+    waitx   ##20_000
+
+    drvh    #oled_reset
+
+    waitx   ##9_000_000
+
+    ret
+
+
+' =========================
+' OLED INIT
+'
+' SSD1306 orientation:
+'
+' Segment direction = $A0
+' COM direction     = $C0
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+
+    mov     cmd, #$00
+
+    call    #send_cmd
+
+
+    mov     cmd, #$10
+
+    call    #send_cmd
+
+    ret
+
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+'
+' 256 longs = 1024 bytes
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+
+    mov     count, ##256
+
+    mov     value, #0
+
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+'
+' Sends framebuffer directly
+' to OLED RAM.
+'
+' No reverse traversal.
+' No bit reversal.
+' No software rotation here.
+' =========================
+
+push_buffer
+
+    mov     ptr, ##frame_buffer
+
+    mov     page, #0
+
+    mov     page_count, #8
+
+
+push_page_loop
+
+    call    #set_pos
+
+    mov     count, #128
+
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+
+    call    #send_data
+
+    add     ptr, #1
+
+    djnz    count, #push_column_loop
+
+
+    add     page, #1
+
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' FRAME DELAY
+' =========================
+
+frame_delay
+
+    waitx   ##2_000_000
+
+    ret
+
+
+' =========================
+' SOFTWARE SPI
+'
+' MSB first
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+
+.loop
+
+    testb   cmd, #7 wc
+
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+
+    waitx   ##100
+
+    drvl    #oled_sck
+
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+
+page            res 1
+page_count      res 1
+
+
+xpos            res 1
+ypos            res 1
+
+
+phys_x          res 1
+phys_y          res 1
+
+
+temp            res 1
+ptr             res 1
+value           res 1
+offset          res 1
+mask            res 1
+
+
+line_count      res 1
+player_x        res 1
+player_y        res 1
+
+frame           res 1
+
+
+
+' =========================
+' HUB RAM FRAMEBUFFER
+'
+' 128 x 64 monochrome OLED
+'
+' 8 pages x 128 bytes
+' = 1024 bytes
+'
+' Logical coordinates:
+'
+' X = 0 through 127
+' Y = 0 through 63
+'
+' OLED remains configured:
+'
+' $A0 segment direction
+' $C0 COM direction
+'
+' set_pixel handles the
+' physical orientation.
+' =========================
+
+    orgh
+
+
+frame_buffer
+
+    byte    0[1024]

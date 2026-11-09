@@ -1,0 +1,775 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 102 / 119
+'
+' Animated Spiral
+'
+' Category: HUB RAM Animation
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+' =========================
+' ANIMATED SPIRAL
+'
+' The spiral is stored as
+' X/Y control points.
+'
+' Each point is connected to
+' the next point.
+'
+' The spiral grows outward,
+' pauses, then unwinds inward.
+'
+' The animation repeats forever.
+' =========================
+
+spiral_restart
+
+    call    #clear_buffer
+    call    #push_buffer
+
+' =========================
+' GROW SPIRAL
+' =========================
+
+    mov     visible_segments, #1
+    mov     frame_count, #63
+
+spiral_grow_loop
+
+    call    #clear_buffer
+
+    mov     point_ptr, ##spiral_points
+
+' -------------------------
+' FIRST POINT
+' -------------------------
+
+    rdbyte  x1, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  y1, point_ptr
+    add     point_ptr, #1
+
+    mov     segment_count, visible_segments
+
+spiral_grow_segment_loop
+
+' -------------------------
+' NEXT POINT
+' -------------------------
+
+    rdbyte  x2, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  y2, point_ptr
+    add     point_ptr, #1
+
+' -------------------------
+' CONNECT THE TWO POINTS
+' -------------------------
+
+    call    #draw_line
+
+' -------------------------
+' NEXT SEGMENT
+' -------------------------
+
+    mov     x1, x2
+    mov     y1, y2
+
+    djnz    segment_count, #spiral_grow_segment_loop
+
+' -------------------------
+' SHOW FRAME
+' -------------------------
+
+    call    #push_buffer
+    call    #frame_delay
+
+    add     visible_segments, #1
+
+    djnz    frame_count, #spiral_grow_loop
+
+' =========================
+' HOLD COMPLETE SPIRAL
+' =========================
+
+    call    #hold_delay
+
+' =========================
+' UNWIND SPIRAL
+' =========================
+
+    mov     visible_segments, #62
+    mov     frame_count, #62
+
+spiral_shrink_loop
+
+    call    #clear_buffer
+
+    mov     point_ptr, ##spiral_points
+
+' -------------------------
+' FIRST POINT
+' -------------------------
+
+    rdbyte  x1, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  y1, point_ptr
+    add     point_ptr, #1
+
+    mov     segment_count, visible_segments
+
+spiral_shrink_segment_loop
+
+' -------------------------
+' NEXT POINT
+' -------------------------
+
+    rdbyte  x2, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  y2, point_ptr
+    add     point_ptr, #1
+
+    call    #draw_line
+
+    mov     x1, x2
+    mov     y1, y2
+
+    djnz    segment_count, #spiral_shrink_segment_loop
+
+' -------------------------
+' SHOW FRAME
+' -------------------------
+
+    call    #push_buffer
+    call    #frame_delay
+
+    sub     visible_segments, #1
+
+    djnz    frame_count, #spiral_shrink_loop
+
+' -------------------------
+' EMPTY FRAME
+' -------------------------
+
+    call    #clear_buffer
+    call    #push_buffer
+
+    call    #hold_delay
+
+    jmp     #spiral_restart
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+    djnz    count, #push_column_loop
+
+    add     page, #1
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions.  The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+    testb   rot_src, #0 wc
+if_c or      rot_dst, #1
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+
+    shr     offset, #3
+    shl     offset, #7
+
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+
+    mov     temp, ypos
+    and     temp, #7
+
+    shl     mask, temp
+
+    or      value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' DRAW LINE
+'
+' Connect:
+'
+' x1,y1
+'
+' to:
+'
+' x2,y2
+'
+' Each pass draws one pixel.
+'
+' X moves one pixel toward x2.
+' Y moves one pixel toward y2.
+'
+' Because each coordinate moves
+' directly toward its destination,
+' the loop always terminates.
+' =========================
+
+draw_line
+
+    mov     line_x, x1
+    mov     line_y, y1
+
+draw_line_loop
+
+' -------------------------
+' DRAW CURRENT PIXEL
+' -------------------------
+
+    mov     xpos, line_x
+    mov     ypos, line_y
+
+    call    #set_pixel
+
+' -------------------------
+' ARE WE FINISHED?
+' -------------------------
+
+    cmp     line_x, x2 wz
+
+if_nz   jmp     #line_move_x
+
+    cmp     line_y, y2 wz
+
+if_z    ret
+
+    jmp     #line_move_y
+
+' =========================
+' MOVE X
+' =========================
+
+line_move_x
+
+' -------------------------
+' EQUAL?
+'
+' If equal, X does not move.
+' -------------------------
+
+    cmp     line_x, x2 wz
+
+if_z    jmp     #line_move_y
+
+' -------------------------
+' LESS THAN?
+'
+' C = 1 when line_x < x2
+' -------------------------
+
+    cmp     line_x, x2 wc
+
+if_c    jmp     #line_x_add
+
+' -------------------------
+' GREATER THAN
+' -------------------------
+
+    sub     line_x, #1
+
+    jmp     #line_move_y
+
+line_x_add
+
+    add     line_x, #1
+
+' =========================
+' MOVE Y
+' =========================
+
+line_move_y
+
+' -------------------------
+' EQUAL?
+' -------------------------
+
+    cmp     line_y, y2 wz
+
+if_z    jmp     #draw_line_loop
+
+' -------------------------
+' LESS THAN?
+' -------------------------
+
+    cmp     line_y, y2 wc
+
+if_c    jmp     #line_y_add
+
+' -------------------------
+' GREATER THAN
+' -------------------------
+
+    sub     line_y, #1
+
+    jmp     #draw_line_loop
+
+line_y_add
+
+    add     line_y, #1
+
+    jmp     #draw_line_loop
+
+' =========================
+' FRAME DELAY
+' =========================
+
+frame_delay
+
+    waitx   ##3_000_000
+
+    ret
+
+' =========================
+' HOLD DELAY
+' =========================
+
+hold_delay
+
+    waitx   ##24_000_000
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd                 res 1
+count               res 1
+spi_count           res 1
+
+page                res 1
+page_count          res 1
+
+xpos                res 1
+ypos                res 1
+
+temp                res 1
+
+ptr                 res 1
+point_ptr           res 1
+
+value               res 1
+offset              res 1
+mask                res 1
+
+visible_segments    res 1
+segment_count       res 1
+frame_count         res 1
+
+x1                  res 1
+y1                  res 1
+
+x2                  res 1
+y2                  res 1
+
+line_x              res 1
+line_y              res 1
+
+' =========================
+' HUB RAM
+' =========================
+
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+' =========================
+' FRAMEBUFFER
+' =========================
+
+frame_buffer
+
+    byte    0[1024]
+
+' =========================
+' SPIRAL POINTS
+'
+' 64 X/Y control points.
+'
+' Adjacent points are connected
+' by draw_line.
+' =========================
+
+spiral_points
+
+    byte    64,32
+    byte    65,32
+    byte    65,33
+    byte    64,34
+
+    byte    63,34
+    byte    62,34
+    byte    61,33
+    byte    61,32
+
+    byte    61,31
+    byte    61,30
+    byte    62,29
+    byte    63,28
+
+    byte    64,28
+    byte    66,28
+    byte    67,29
+    byte    68,29
+
+    byte    69,30
+    byte    70,31
+    byte    70,33
+    byte    70,34
+
+    byte    69,35
+    byte    68,36
+    byte    67,37
+    byte    65,37
+
+    byte    63,37
+    byte    61,37
+    byte    59,36
+    byte    57,35
+
+    byte    56,34
+    byte    55,32
+    byte    55,30
+    byte    56,28
+
+    byte    57,27
+    byte    59,25
+    byte    61,24
+    byte    64,23
+
+    byte    67,23
+    byte    70,24
+    byte    72,25
+    byte    74,27
+
+    byte    76,29
+    byte    77,32
+    byte    77,35
+    byte    76,38
+
+    byte    74,40
+    byte    72,42
+    byte    69,44
+    byte    66,45
+
+    byte    62,45
+    byte    58,44
+    byte    54,43
+    byte    51,41
+
+    byte    48,38
+    byte    46,35
+    byte    45,31
+    byte    46,27
+
+    byte    48,23
+    byte    51,20
+    byte    55,17
+    byte    60,15
+
+    byte    65,14
+    byte    70,15
+    byte    75,17
+    byte    80,20

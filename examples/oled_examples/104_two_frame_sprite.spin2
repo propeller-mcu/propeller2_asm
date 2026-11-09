@@ -1,0 +1,785 @@
+' =========================================================
+'
+' P2ASM OLED DEMO 104 / 119
+'
+' Two Frame Sprite
+'
+' Category: HUB RAM Animation
+'
+' =========================================================
+
+CON
+
+    _CLKFREQ = 180_000_000
+
+    oled_sck   = 0
+    oled_mosi  = 1
+    oled_reset = 2
+    oled_dc    = 3
+    oled_cs    = 4
+
+DAT
+
+    org 0
+    asmclk
+
+' -------------------------
+' GPIO INIT
+' -------------------------
+
+    drvh    #oled_cs
+    drvh    #oled_dc
+    drvl    #oled_sck
+    dirh    #oled_mosi
+    dirh    #oled_dc
+    dirh    #oled_reset
+    dirh    #oled_cs
+    dirh    #oled_sck
+
+
+' =========================
+' MAIN
+' =========================
+
+main
+
+    call    #reset_oled
+    call    #oled_init
+
+    mov     frame_index, #0
+
+two_frame_sprite_loop
+
+    call    #clear_buffer
+
+    mov     sprite_x, #60
+    mov     sprite_y, #28
+
+    cmp     frame_index, #0 wz
+if_z mov     sprite_ptr, ##sprite_frame_1
+if_nz mov    sprite_ptr, ##sprite_frame_2
+
+    call    #draw_8x8_sprite
+
+    call    #push_buffer
+    waitx   ##18_000_000
+
+    xor     frame_index, #1
+    jmp     #two_frame_sprite_loop
+
+' =========================
+' DRAW 8x8 SPRITE
+' =========================
+
+draw_8x8_sprite
+
+    mov     sprite_row, #0
+
+sprite_row_loop
+
+    rdbyte  sprite_byte, sprite_ptr
+    add     sprite_ptr, #1
+
+    mov     sprite_bit, #0
+
+sprite_bit_loop
+
+    testb   sprite_byte, sprite_bit wz
+if_z jmp     #sprite_skip_pixel
+
+    mov     xpos, sprite_x
+    add     xpos, sprite_bit
+
+    mov     ypos, sprite_y
+    add     ypos, sprite_row
+
+    call    #set_pixel
+
+sprite_skip_pixel
+
+    add     sprite_bit, #1
+    cmp     sprite_bit, #8 wc
+if_b jmp     #sprite_bit_loop
+
+    add     sprite_row, #1
+    cmp     sprite_row, #8 wc
+if_b jmp     #sprite_row_loop
+
+    ret
+
+
+' =========================
+' RESET OLED
+' =========================
+
+reset_oled
+
+    drvl    #oled_reset
+    waitx   ##20_000
+
+    drvh    #oled_reset
+    waitx   ##9_000_000
+
+    ret
+
+' =========================
+' OLED INIT
+' =========================
+
+oled_init
+
+    mov     cmd, #$AE
+    call    #send_cmd
+
+    mov     cmd, #$D5
+    call    #send_cmd
+
+    mov     cmd, #$80
+    call    #send_cmd
+
+    mov     cmd, #$A8
+    call    #send_cmd
+
+    mov     cmd, #$3F
+    call    #send_cmd
+
+    mov     cmd, #$D3
+    call    #send_cmd
+
+    mov     cmd, #0
+    call    #send_cmd
+
+    mov     cmd, #$40
+    call    #send_cmd
+
+    mov     cmd, #$A0
+    call    #send_cmd
+
+    mov     cmd, #$C0
+    call    #send_cmd
+
+    mov     cmd, #$DA
+    call    #send_cmd
+
+    mov     cmd, #$12
+    call    #send_cmd
+
+    mov     cmd, #$81
+    call    #send_cmd
+
+    mov     cmd, #$7F
+    call    #send_cmd
+
+    mov     cmd, #$20
+    call    #send_cmd
+
+    mov     cmd, #$02
+    call    #send_cmd
+
+    mov     cmd, #$A4
+    call    #send_cmd
+
+    mov     cmd, #$A6
+    call    #send_cmd
+
+    mov     cmd, #$8D
+    call    #send_cmd
+
+    mov     cmd, #$14
+    call    #send_cmd
+
+    mov     cmd, #$AF
+    call    #send_cmd
+
+    ret
+
+' =========================
+' SEND COMMAND
+' =========================
+
+send_cmd
+
+    drvl    #oled_cs
+    drvl    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SEND DATA
+' =========================
+
+send_data
+
+    drvl    #oled_cs
+    drvh    #oled_dc
+
+    call    #spi8
+
+    drvh    #oled_cs
+
+    ret
+
+' =========================
+' SET PAGE POSITION
+' =========================
+
+set_pos
+
+    mov     cmd, page
+    or      cmd, #$B0
+    call    #send_cmd
+
+    mov     cmd, #$00
+    call    #send_cmd
+
+    mov     cmd, #$10
+    call    #send_cmd
+
+    ret
+
+' =========================
+' CLEAR HUB FRAMEBUFFER
+' =========================
+
+clear_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, #0
+
+clear_buffer_loop
+
+    wrlong  value, ptr
+    add     ptr, #4
+
+    djnz    count, #clear_buffer_loop
+
+    ret
+
+' =========================
+' FILL HUB FRAMEBUFFER
+' =========================
+
+fill_buffer
+
+    mov     ptr, ##frame_buffer
+    mov     count, ##256
+    mov     value, ##$FFFFFFFF
+
+fill_buffer_loop
+
+    wrlong  value, ptr
+    add     ptr, #4
+
+    djnz    count, #fill_buffer_loop
+
+    ret
+
+' =========================
+' PUSH HUB FRAMEBUFFER
+' =========================
+
+push_buffer
+
+    ' Read the HUB framebuffer from the end toward the beginning.
+    ' Reversing byte order and bit order performs a 180-degree
+    ' software rotation while keeping the OLED at $A0 / $C0.
+
+    mov     ptr, ##frame_buffer
+    add     ptr, ##1023
+
+    mov     page, #0
+    mov     page_count, #8
+
+push_page_loop
+
+    call    #set_pos
+    mov     count, #128
+
+push_column_loop
+
+    rdbyte  cmd, ptr
+    call    #rotate_display_byte
+    call    #send_data
+
+    sub     ptr, #1
+    djnz    count, #push_column_loop
+
+    add     page, #1
+    djnz    page_count, #push_page_loop
+
+    ret
+
+
+' =========================
+' REVERSE DATA BYTE FOR DISPLAY
+'
+' $A0/$C0 are kept as the controller's
+' normal directions.  The module is mounted
+' 180 degrees from the chosen viewing orientation,
+' so framebuffer output is rotated in software.
+' =========================
+
+rotate_display_byte
+
+    mov     rot_src, cmd
+    mov     rot_dst, #0
+    mov     rot_count, #8
+
+rotate_display_byte_loop
+
+    shl     rot_dst, #1
+    testb   rot_src, #0 wc
+if_c or      rot_dst, #1
+    shr     rot_src, #1
+
+    djnz    rot_count, #rotate_display_byte_loop
+
+    mov     cmd, rot_dst
+    ret
+
+' =========================
+' SET PIXEL IN HUB RAM
+' =========================
+
+set_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    or      value, mask
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' CLEAR PIXEL IN HUB RAM
+' =========================
+
+clear_pixel
+
+    mov     offset, ypos
+    shr     offset, #3
+    shl     offset, #7
+    add     offset, xpos
+
+    mov     ptr, ##frame_buffer
+    add     ptr, offset
+
+    rdbyte  value, ptr
+
+    mov     mask, #1
+    mov     temp, ypos
+    and     temp, #7
+    shl     mask, temp
+
+    xor     mask, #$FF
+    and     value, mask
+
+    wrbyte  value, ptr
+
+    ret
+
+' =========================
+' DRAW HORIZONTAL LINE
+'
+' xpos       = starting X
+' ypos       = Y position
+' line_count = number of pixels
+' =========================
+
+draw_hline
+
+draw_hline_loop
+
+    call    #set_pixel
+    add     xpos, #1
+
+    djnz    line_count, #draw_hline_loop
+
+    ret
+
+' =========================
+' DRAW VERTICAL LINE
+'
+' xpos       = X position
+' ypos       = starting Y
+' line_count = number of pixels
+' =========================
+
+draw_vline
+
+draw_vline_loop
+
+    call    #set_pixel
+    add     ypos, #1
+
+    djnz    line_count, #draw_vline_loop
+
+    ret
+
+' =========================
+' DRAW SQUARE OUTLINE
+'
+' center_x    = square center X
+' center_y    = square center Y
+' shape_size  = half size
+' =========================
+
+draw_square_outline
+
+    mov     xpos, center_x
+    sub     xpos, shape_size
+    mov     ypos, center_y
+    sub     ypos, shape_size
+
+    mov     line_count, shape_size
+    shl     line_count, #1
+    add     line_count, #1
+    call    #draw_hline
+
+    mov     xpos, center_x
+    sub     xpos, shape_size
+    mov     ypos, center_y
+    add     ypos, shape_size
+
+    mov     line_count, shape_size
+    shl     line_count, #1
+    add     line_count, #1
+    call    #draw_hline
+
+    mov     xpos, center_x
+    sub     xpos, shape_size
+    mov     ypos, center_y
+    sub     ypos, shape_size
+
+    mov     line_count, shape_size
+    shl     line_count, #1
+    add     line_count, #1
+    call    #draw_vline
+
+    mov     xpos, center_x
+    add     xpos, shape_size
+    mov     ypos, center_y
+    sub     ypos, shape_size
+
+    mov     line_count, shape_size
+    shl     line_count, #1
+    add     line_count, #1
+    call    #draw_vline
+
+    ret
+
+' =========================
+' DRAW RECTANGLE OUTLINE
+'
+' rect_left
+' rect_top
+' rect_width
+' rect_height
+' =========================
+
+draw_rectangle_outline
+
+    mov     xpos, rect_left
+    mov     ypos, rect_top
+    mov     line_count, rect_width
+    call    #draw_hline
+
+    mov     xpos, rect_left
+    mov     ypos, rect_top
+    add     ypos, rect_height
+    sub     ypos, #1
+    mov     line_count, rect_width
+    call    #draw_hline
+
+    mov     xpos, rect_left
+    mov     ypos, rect_top
+    mov     line_count, rect_height
+    call    #draw_vline
+
+    mov     xpos, rect_left
+    add     xpos, rect_width
+    sub     xpos, #1
+    mov     ypos, rect_top
+    mov     line_count, rect_height
+    call    #draw_vline
+
+    ret
+
+' =========================
+' DRAW DIAMOND OUTLINE
+'
+' center_x
+' center_y
+' shape_size
+' =========================
+
+draw_diamond_outline
+
+    mov     shape_step, #0
+
+draw_diamond_loop
+
+    mov     xpos, center_x
+    add     xpos, shape_step
+    mov     ypos, center_y
+    sub     ypos, shape_size
+    add     ypos, shape_step
+    call    #set_pixel
+
+    mov     xpos, center_x
+    add     xpos, shape_size
+    sub     xpos, shape_step
+    mov     ypos, center_y
+    add     ypos, shape_step
+    call    #set_pixel
+
+    mov     xpos, center_x
+    sub     xpos, shape_step
+    mov     ypos, center_y
+    add     ypos, shape_size
+    sub     ypos, shape_step
+    call    #set_pixel
+
+    mov     xpos, center_x
+    sub     xpos, shape_size
+    add     xpos, shape_step
+    mov     ypos, center_y
+    sub     ypos, shape_step
+    call    #set_pixel
+
+    add     shape_step, #1
+
+    cmp     shape_step, shape_size wc
+if_be jmp     #draw_diamond_loop
+
+    ret
+
+' =========================
+' DRAW APPROXIMATE CIRCLE
+'
+' center_x
+' center_y
+' shape_size
+'
+' Uses a simple 32-point table
+' scaled by shape_size / 8.
+' This keeps the animation demos
+' readable rather than burying the
+' lesson in a large circle routine.
+' =========================
+
+draw_circle_outline
+
+    mov     point_ptr, ##unit_circle_points
+    mov     point_count, #32
+
+draw_circle_point_loop
+
+    rdbyte  temp_x, point_ptr
+    add     point_ptr, #1
+
+    rdbyte  temp_y, point_ptr
+    add     point_ptr, #1
+
+    sub     temp_x, #8
+    sub     temp_y, #8
+
+    mov     scaled_x, temp_x
+    qmul    scaled_x, shape_size
+    getqx   scaled_x
+    sar     scaled_x, #3
+
+    mov     scaled_y, temp_y
+    qmul    scaled_y, shape_size
+    getqx   scaled_y
+    sar     scaled_y, #3
+
+    mov     xpos, center_x
+    add     xpos, scaled_x
+
+    mov     ypos, center_y
+    add     ypos, scaled_y
+
+    call    #set_pixel
+
+    djnz    point_count, #draw_circle_point_loop
+
+    ret
+
+' =========================
+' FRAME DELAY
+' =========================
+
+frame_delay
+
+    waitx   ##18_000_000
+
+    ret
+
+' =========================
+' SOFTWARE SPI
+' =========================
+
+spi8
+
+    mov     spi_count, #8
+
+.loop
+
+    testb   cmd, #7 wc
+    outc    #oled_mosi
+
+    waitx   ##100
+
+    drvh    #oled_sck
+    waitx   ##100
+
+    drvl    #oled_sck
+    waitx   ##100
+
+    rol     cmd, #1
+
+    djnz    spi_count, #.loop
+
+    ret
+
+' =========================
+' END
+' =========================
+
+end
+
+    jmp     #end
+
+' =========================
+' VARIABLES
+' =========================
+
+cmd             res 1
+count           res 1
+spi_count       res 1
+
+page            res 1
+page_count      res 1
+
+xpos            res 1
+ypos            res 1
+
+temp            res 1
+temp_x          res 1
+temp_y          res 1
+scaled_x        res 1
+scaled_y        res 1
+
+ptr             res 1
+point_ptr       res 1
+
+value           res 1
+offset          res 1
+mask            res 1
+
+line_count      res 1
+point_count     res 1
+row_count       res 1
+column_count    res 1
+
+center_x        res 1
+center_y        res 1
+shape_size      res 1
+shape_step      res 1
+
+rect_left       res 1
+rect_top        res 1
+rect_width      res 1
+rect_height     res 1
+
+frame_count     res 1
+frame_index     res 1
+direction       res 1
+
+random_value    res 1
+random_count    res 1
+
+sprite_ptr      res 1
+sprite_x        res 1
+sprite_y        res 1
+sprite_row      res 1
+sprite_bit      res 1
+sprite_byte     res 1
+
+' =========================
+' HUB RAM
+' =========================
+
+
+rot_src         res 1
+rot_dst         res 1
+rot_count       res 1
+
+    orgh
+
+frame_buffer
+
+    byte    0[1024]
+
+' -------------------------
+' 32-POINT UNIT CIRCLE
+'
+' Coordinates are stored in a
+' 0..16 grid centered at 8,8.
+' -------------------------
+
+unit_circle_points
+
+    byte    16,8,16,10,15,11,15,13
+    byte    14,14,13,15,11,15,10,16
+    byte    8,16,6,16,5,15,3,15
+    byte    2,14,1,13,1,11,0,10
+    byte    0,8,0,6,1,5,1,3
+    byte    2,2,3,1,5,1,6,0
+    byte    8,0,10,0,11,1,13,1
+    byte    14,2,15,3,15,5,16,6
+
+' -------------------------
+' SPRITE FRAME DATA
+' -------------------------
+
+sprite_frame_1
+
+    byte    %00011000
+    byte    %00111100
+    byte    %01111110
+    byte    %11011011
+    byte    %11111111
+    byte    %00100100
+    byte    %01000010
+    byte    %10000001
+
+sprite_frame_2
+
+    byte    %00011000
+    byte    %00111100
+    byte    %01111110
+    byte    %11011011
+    byte    %11111111
+    byte    %00011000
+    byte    %00100100
+    byte    %01000010
