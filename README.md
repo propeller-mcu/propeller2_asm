@@ -21,6 +21,11 @@ Welcome to the **Propeller 2 Assembly Guides**, a complete beginner-friendly rep
 
 ## Updates
 
+### 2026-11-09
+
+### Example code
+- Added supplemental example programs for OLED displays
+
 ### 2026-08-31
 
 ### Beginner guide updates
